@@ -188,6 +188,26 @@
           <span class="btn-label">Útpont</span>
           <span class="btn-hint">Új útpont felvétele és pontosítása</span>
         </button>
+
+        <!-- 5. BOT BE/KI KAPCSOLÓ GOMB (SM SEGÉDESZKÖZ) -->
+        <button type="button" class="action-btn-stacked btn-stick-toggle" id="btn-action-stick">
+          <span class="btn-icon">🦯</span>
+          <span class="btn-label" id="btn-stick-label">Bot használata: NEM</span>
+          <span class="btn-hint" id="btn-stick-hint">Kattints a bekapcsoláshoz</span>
+        </button>
+
+        <!-- Élő Bottal / Bot nélkül méterszámláló séta közben -->
+        <div class="stick-live-strip" id="stick-live-strip" style="display:none;">
+          <div class="stick-strip-pill">
+            <span class="pill-icon">🚶</span>
+            <span>Bot nélkül: <strong id="live-dist-no-stick" style="color:var(--accent-mint);">0 m</strong></span>
+          </div>
+          <div class="stick-strip-divider"></div>
+          <div class="stick-strip-pill">
+            <span class="pill-icon">🦯</span>
+            <span>Bottal: <strong id="live-dist-stick" style="color:var(--accent-gold, #fbbf24);">0 m</strong></span>
+          </div>
+        </div>
       </section>
 
       <!-- 4. ALATTA: TÉRKÉP KÉT RÉTEGGEL (UTCANÉZET & MŰHOLDKÉP) -->
@@ -467,11 +487,11 @@
               Ha eléred az 500 métert, a következő szint automatikusan feloldódik: <strong style="color:var(--accent-gold);" id="active-level-next-hint">2. Szint (1000 lépés)</strong>!
             </p>
             <div class="level-progress-track">
-              <div class="level-progress-fill" id="active-level-progress-fill" style="width: 82%;"></div>
+              <div class="level-progress-fill" id="active-level-progress-fill" style="width: 0%;"></div>
             </div>
             <div style="font-size:0.8rem; font-weight:800; color:#fff; margin-top:0.35rem; display:flex; justify-content:space-between;">
-              <span id="active-level-progress-text">Jelenlegi állás: 410 m / 500 m (82%)</span>
-              <span id="active-level-status-pill" style="color:var(--accent-gold);">🎯 Folyamatban</span>
+              <span id="active-level-progress-text">Jelenlegi állás: 0 m / 500 m (0%) — Még nincs rögzített séta</span>
+              <span id="active-level-status-pill" style="color:var(--text-muted);">🎯 Kezdésre vár</span>
             </div>
           </div>
           <button type="button" class="btn-subtle" id="btn-trigger-level-editor" style="white-space:nowrap;">
@@ -520,27 +540,27 @@
           <div class="compare-card">
             <div class="compare-title">Elégetett Kalória</div>
             <div class="compare-val" style="color:#fbbf24;">
-              <span>🔥</span> <span id="fit-calories-val">38 kcal</span>
+              <span>🔥</span> <span id="fit-calories-val">0 kcal</span>
             </div>
-            <div class="compare-desc">Napi összesített: 114 kcal (3 rövid kímélő séta során)</div>
+            <div class="compare-desc" id="fit-calories-desc">Még nincs rögzített séta a kalóriaszámításhoz</div>
           </div>
 
           <!-- Napi változás -->
           <div class="compare-card">
             <div class="compare-title">Előző Napi Átlaghoz Képest</div>
             <div class="compare-val">
-              <span>▲</span> <span id="fit-daily-change">+9.5%</span>
+              <span>—</span> <span id="fit-daily-change">0.0%</span>
             </div>
-            <div class="compare-desc">Tegnaphoz képest +15 méterrel több aktív járástáv</div>
+            <div class="compare-desc" id="fit-daily-desc">Még nincs korábbi séta az összehasonlításhoz</div>
           </div>
 
           <!-- Heti / Havi változás -->
           <div class="compare-card">
             <div class="compare-title">Előző Heti / Havi Átlaghoz</div>
             <div class="compare-val">
-              <span>▲</span> <span id="fit-weekly-change">+14.2%</span>
+              <span>—</span> <span id="fit-weekly-change">0.0%</span>
             </div>
-            <div class="compare-desc">Havi bázishoz képest: <strong>+28.0%</strong> tartós mobilitásjavulás</div>
+            <div class="compare-desc" id="fit-weekly-desc">Még nincs heti átlag</div>
           </div>
 
         </div>
@@ -548,7 +568,7 @@
         <!-- ERŐSÖDÉS ÁTLAGA A SEBESSÉGBŐL SZÁMOLVA (SM REHABILITÁCIÓS MUTATÓ!) -->
         <div class="strength-calculation-banner">
           <div class="strength-gauge-circle">
-            <span class="s-pct" id="strength-pct-val">+16.4%</span>
+            <span class="s-pct" id="strength-pct-val">0.0%</span>
             <span class="s-label">Erősödés</span>
           </div>
           <div class="strength-info-content">
@@ -557,7 +577,7 @@
               A sclerosis multiplex rehabilitációjában az 1 perces pihenők közötti szakaszsebesség és a lépéstempó egyenletessége az alsó végtagi izomerő és a motoros stabilitás közvetlen mutatója.
             </p>
             <p style="margin-top:0.35rem; color:#67e8f9; font-weight:700;">
-              ✨ Jelenlegi járásstabilitási index: <strong>8.4 / 10</strong> — Csökkenő lábnehezedés és kitartóbb lépések!
+              ✨ Jelenlegi járásstabilitási index: <strong>Kezdésre vár</strong> — Rögzíts egy sétát az elemzéshez!
             </p>
           </div>
         </div>
@@ -860,6 +880,17 @@
                 <option value="pulse" selected>Teljes képernyős pulzáló sárga villogás</option>
                 <option value="banner">Csak felső sárga értesítősáv</option>
               </select>
+            </div>
+
+            <!-- Bot alapértelmezett indítási beállítása -->
+            <div class="s-field" style="grid-column: 1 / -1;">
+              <label for="set-stick-mode">🦯 Bot Használat Alapbeállítása</label>
+              <select id="set-stick-mode">
+                <option value="START_WITHOUT" selected>Induláskor bot nélkül (később bekapcsolható a gombbal)</option>
+                <option value="START_WITH">Induláskor bottal (kikapcsolható séta közben)</option>
+                <option value="ALWAYS">Állandó bot (mindig bottal járok)</option>
+              </select>
+              <small style="color:var(--text-dim); font-size:0.75rem;">Hogyan induljon a bot állapota az új séta megkezdésekor.</small>
             </div>
 
             <div class="s-field" style="grid-column: 1 / -1; margin-top:0.5rem;">

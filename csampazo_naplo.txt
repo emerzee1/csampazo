@@ -1,0 +1,14 @@
+# ========================================================
+# CSÁMPÁZÓ - SM SÉTA- ÉS LÉPÉSNAPLÓ (csampazo_naplo.txt)
+# Sclerosis Multiplex rehabilitációs és séta követő napló
+# Formátum: DÁTUM [SZÓKÖZ] IDŐ | LÉPÉSSZÁM | TÁV (m) | IDŐ (perc:mp) | TÍPUS | PIHENŐK | CÍMKÉK | JEGYZET
+# ========================================================
+# PROFIL: Név: Péter | Napi SM Cél: 100 m | Átlagos lépéshossz: 65 cm | Neurológiai teszttáv: 100 m
+# --------------------------------------------------------
+2026-10-06 | 135 | 92 m | 02:40 | 100m SM Alapteszt | 1 pihenő | #könnyű #reggel | 15 másodperc pihenő a padnál 60 méternél, jó egyensúly
+2026-10-07 | 152 | 104 m | 03:05 | 100m SM Alapteszt | 2 pihenő | #cél_teljesítve #délután | Sikeres 100 méter, két rövid megállással stabil járás
+2026-10-08 | 98 | 65 m | 01:55 | Kímélő séta | 1 pihenő | #fáradékonyság | Enyhe lábnehezedés miatt ma 65 méternél megálltam
+2026-10-09 | 148 | 101 m | 02:50 | 100m SM Alapteszt | 1 pihenő | #jó_forma #park | Margitszigeti rózsakert mellett, szép egyenletes lépések
+2026-10-10 | 185 | 125 m | 03:30 | Növelt táv | 2 pihenő | #hétvége #siker | Új rekord: 125 méter! Két pihenővel kényelmesen ment
+2026-10-11 | 140 | 95 m | 02:45 | 100m SM Alapteszt | 1 pihenő | #gyógytorna_után | Gyógytorna utáni levezető séta, jó közérzet
+2026-10-12 | 158 | 110 m | 03:10 | 100m SM Alapteszt | 1 pihenő | #mai_séta #térkép | Mai térképes séta elmentve a naplóba, 100 méter felett!

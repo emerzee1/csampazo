@@ -1,0 +1,64 @@
+# ========================================================
+# CSÁMPÁZÓ - SM KÍMÉLŐ SÉTAÚTVONALAK (csampazo_utvonalak.txt)
+# Sclerosis Multiplex betegek számára válogatott, akadálymentes séták pihenőpadokkal
+# ========================================================
+
+[UTVONAL]
+ID: utvonal_margitsziget_rozsakert_01
+CIM: Margitsziget - Rózsakert Kímélő Séta (100 m)
+TAV: 100 m
+SZINT: 0 m
+IDO: 3 perc
+NEHEZSEG: SM Kímélő (Könnyű)
+TIPUS: Akadálymentes, Sétány
+CIMKE: #100m_alapteszt #padok #sík #árnyas #biztonságos
+ERTEKELES: 5
+FOTO: https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&q=80
+LEIRAS:
+Ideális 100 méteres SM alapteszt sétaútvonal a Margitszigeti Rózsakert mentén. Tökéletesen sík, széles aszfaltozott sétány, 35 és 70 méternél kényelmes háttámlás padokkal a pihenéshez. Nincsenek lépcsők vagy szintkülönbségek.
+[/UTVONAL]
+
+[UTVONAL]
+ID: utvonal_varosliget_topart_02
+CIM: Városliget - Tóparti Kímélő Sétány (150 m)
+TAV: 150 m
+SZINT: 0 m
+IDO: 4 perc
+NEHEZSEG: SM Kímélő (Könnyű)
+TIPUS: Park, Vízpart
+CIMKE: #tópart #akadálymentes #árnyék #pihenőhelyek
+ERTEKELES: 5
+FOTO: https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&q=80
+LEIRAS:
+Csendes, tóparti séta a Millennium Háza és a tó között. Sima térkő burkolat, sűrűn elhelyezett pihenőpadok, tiszta levegő és gyönyörű zöld környezet.
+[/UTVONAL]
+
+[UTVONAL]
+ID: utvonal_millenaris_03
+CIM: Millenáris Park - Tavak körüli Séta (120 m)
+TAV: 120 m
+SZINT: 0 m
+IDO: 3 perc
+NEHEZSEG: SM Kímélő (Könnyű)
+TIPUS: Városi park, Sík
+CIMKE: #modern #sík #jól_járható #padok
+ERTEKELES: 4
+FOTO: https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&q=80
+LEIRAS:
+Kellemes bel-budai kímélő séta a Millenáris Park dísztavai mentén. Tökéletes burkolat, szélvédett részek, kényelmes pihenőkkel.
+[/UTVONAL]
+
+[UTVONAL]
+ID: utvonal_normafa_terasz_04
+CIM: Normafa - Panoráma Terasz Kímélő Séta (80 m)
+TAV: 80 m
+SZINT: 0 m
+IDO: 2 perc
+NEHEZSEG: SM Kímélő (Rövid)
+TIPUS: Természet, Kilátó
+CIMKE: #friss_levegő #rövid #padok #panoráma
+ERTEKELES: 5
+FOTO: https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80
+LEIRAS:
+Rövid, 80 méteres kényelmes séta a Normafa síház előtti új, sík gumiburkolatú sétányon a kilátópontig. Friss hegyi levegő és panoráma megerőltető túrázás nélkül.
+[/UTVONAL]

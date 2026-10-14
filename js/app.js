@@ -42,7 +42,8 @@
       targetGoalVal: 500,       // Napi cél értéke (pl. 500)
       targetGoalType: 'meters', // 'meters' vagy 'steps'
       stepLengthCm: 65,
-      pauseBlinkMode: 'pulse'
+      pauseBlinkMode: 'pulse',
+      stickMode: 'START_WITHOUT' // 'START_WITHOUT' | 'START_WITH' | 'ALWAYS'
     },
 
     // Élő séta állapot (Másodperc alapú mérés)
@@ -51,6 +52,9 @@
     durationSec: 0,
     meters: 0,
     steps: 0,
+    isUsingStick: false,
+    stickMeters: 0,
+    noStickMeters: 0,
     timerInterval: null,
     activeMovingSecLive: 0,
     restingSecLive: 0,
@@ -154,6 +158,9 @@
       const savedSettings = localStorage.getItem('csampazo_settings');
       if (savedSettings) {
         state.settings = { ...state.settings, ...JSON.parse(savedSettings) };
+      }
+      if (state.settings.stickMode === 'ALWAYS' || state.settings.stickMode === 'START_WITH') {
+        state.isUsingStick = true;
       }
 
       // 3. Saját szintek (Szintlépéses mérföldkövek)
@@ -554,10 +561,12 @@
     const setGoalVal = document.getElementById('set-target-goal-val');
     const setGoalType = document.getElementById('set-target-goal-type');
     const setRestSec = document.getElementById('set-rest-threshold-input');
+    const setStickMode = document.getElementById('set-stick-mode');
 
     if (setGoalVal) setGoalVal.value = state.settings.targetGoalVal;
     if (setGoalType) setGoalType.value = state.settings.targetGoalType;
     if (setRestSec) setRestSec.value = state.settings.restThresholdSec;
+    if (setStickMode) setStickMode.value = state.settings.stickMode || 'START_WITHOUT';
   }
 
   // ==========================================================================
@@ -619,9 +628,15 @@
     if (!listEl) return;
 
     // Megvizsgáljuk, hanyadik szintnél tartunk a jelenlegi teljesítmény alapján
-    // Aktuális mérési alap: mai megtett méter vagy kiválasztott séta
-    const currentMeters = Math.max(state.meters, state.selectedRoute ? state.selectedRoute.meters : 410);
-    const currentSteps = Math.max(state.steps, state.selectedRoute ? state.selectedRoute.steps : 620);
+    // Aktuális mérési alap: kiválasztott séta vagy élő mérés (demo módban minta érték)
+    const fallbackMeters = state.isDemoMode ? 410 : 0;
+    const fallbackSteps = state.isDemoMode ? 620 : 0;
+    const currentMeters = state.selectedRoute 
+      ? state.selectedRoute.meters 
+      : (state.meters > 0 ? state.meters : fallbackMeters);
+    const currentSteps = state.selectedRoute 
+      ? state.selectedRoute.steps 
+      : (state.steps > 0 ? state.steps : fallbackSteps);
 
     let activeIdx = 0;
     for (let i = 0; i < state.levels.length; i++) {
@@ -639,7 +654,7 @@
     const currentLevel = state.levels[activeIdx] || state.levels[0];
     const currentVal = currentLevel.metric === 'meters' ? currentMeters : currentSteps;
     const unit = currentLevel.metric === 'meters' ? 'méter' : 'lépés';
-    const pct = Math.min(100, Math.round((currentVal / currentLevel.target) * 100));
+    const pct = currentVal > 0 ? Math.min(100, Math.round((currentVal / currentLevel.target) * 100)) : 0;
 
     // Aktív banner frissítése
     if (activeNumEl) activeNumEl.textContent = currentLevel.level;
@@ -656,12 +671,21 @@
     }
 
     if (progressFillEl) progressFillEl.style.width = `${pct}%`;
-    if (progressTextEl) progressTextEl.textContent = `Jelenlegi állás: ${currentVal} / ${currentLevel.target} ${unit} (${pct}%)`;
+    if (progressTextEl) {
+      if (currentVal === 0) {
+        progressTextEl.textContent = `Jelenlegi állás: 0 / ${currentLevel.target} ${unit} (0%) — Még nincs rögzített séta`;
+      } else {
+        progressTextEl.textContent = `Jelenlegi állás: ${currentVal} / ${currentLevel.target} ${unit} (${pct}%)`;
+      }
+    }
 
     if (statusPillEl) {
       if (pct >= 100) {
         statusPillEl.textContent = '🎉 SZINTLÉPÉS TELJESÍTVE!';
         statusPillEl.style.color = 'var(--accent-mint)';
+      } else if (currentVal === 0) {
+        statusPillEl.textContent = '🎯 Kezdésre vár';
+        statusPillEl.style.color = 'var(--text-muted)';
       } else {
         statusPillEl.textContent = '🎯 Folyamatban';
         statusPillEl.style.color = 'var(--accent-gold)';
@@ -814,6 +838,51 @@
 
     if (btnWaypoint) btnWaypoint.addEventListener('click', openWaypointModal);
     if (btnQuickWp) btnQuickWp.addEventListener('click', openWaypointModal);
+
+    const btnStick = document.getElementById('btn-action-stick');
+    if (btnStick) {
+      btnStick.addEventListener('click', () => {
+        state.isUsingStick = !state.isUsingStick;
+        updateStickButtonUI();
+        if (state.isUsingStick) {
+          showToast('🦯 Bot használat bekapcsolva!', '🦯');
+        } else {
+          showToast('🚶 Bot használat kikapcsolva!', '🚶');
+        }
+      });
+    }
+    updateStickButtonUI();
+  }
+
+  function updateStickButtonUI() {
+    const btnStick = document.getElementById('btn-action-stick');
+    const label = document.getElementById('btn-stick-label');
+    const hint = document.getElementById('btn-stick-hint');
+    const strip = document.getElementById('stick-live-strip');
+    const distNoStick = document.getElementById('live-dist-no-stick');
+    const distStick = document.getElementById('live-dist-stick');
+
+    if (btnStick && label && hint) {
+      if (state.isUsingStick) {
+        btnStick.classList.add('active');
+        label.textContent = 'Bot használata: BOTTAL JÁROK';
+        hint.textContent = 'Kattints a kikapcsoláshoz';
+      } else {
+        btnStick.classList.remove('active');
+        label.textContent = 'Bot használata: BOT NÉLKÜL';
+        hint.textContent = 'Kattints a bekapcsoláshoz';
+      }
+    }
+
+    if (strip && distNoStick && distStick) {
+      if (state.walkStatus === 'RUNNING' || state.walkStatus === 'PAUSED') {
+        strip.style.display = 'flex';
+        distNoStick.textContent = `${Math.round(state.noStickMeters)} m`;
+        distStick.textContent = `${Math.round(state.stickMeters)} m`;
+      } else {
+        strip.style.display = 'none';
+      }
+    }
   }
 
   // --- Haversine távolságszámítás méterben ---
@@ -895,6 +964,11 @@
             // SM finomhangolás: 0.5 métertől 40 méterig adja hozzá, ha megbízható a pontosság
             if (deltaMeters >= 0.5 && deltaMeters < 40 && acc <= 35) {
               state.meters += deltaMeters;
+              if (state.isUsingStick) {
+                state.stickMeters += deltaMeters;
+              } else {
+                state.noStickMeters += deltaMeters;
+              }
               const stepLenM = (state.settings.stepLengthCm || 65) / 100;
               state.steps = Math.round(state.meters / stepLenM);
               state.recordedPath.push([lat, lng]);
@@ -941,6 +1015,14 @@
     state.restingSecLive = 0;
     state.meters = 0;
     state.steps = 0;
+
+    // Bot állapot inicializálása az alapértelmezett mód szerint
+    if (state.settings.stickMode === 'ALWAYS' || state.settings.stickMode === 'START_WITH') {
+      state.isUsingStick = true;
+    }
+    state.stickMeters = 0;
+    state.noStickMeters = 0;
+
     state.restCountLive = 0;
     state.currentRestDurationLive = 0;
     state.recordedPath = [];
@@ -971,6 +1053,11 @@
         // Ha szimulációs módban vagyunk, a virtuális lépéseket számoljuk
         if (state.gpsMode === 'sim') {
           state.meters += 1.4;
+          if (state.isUsingStick) {
+            state.stickMeters += 1.4;
+          } else {
+            state.noStickMeters += 1.4;
+          }
           state.steps += 2;
 
           if (state.durationSec % 5 === 0 && coordIndex < trackCoords.length - 1) {
@@ -1050,6 +1137,9 @@
       date: today,
       time: new Date().toLocaleTimeString('hu-HU', { hour: '2-digit', minute: '2-digit' }),
       meters: roundedMeters || 110,
+      stickMeters: Math.round(state.stickMeters),
+      noStickMeters: Math.round(state.noStickMeters),
+      stickUsed: state.stickMeters > 0,
       steps: state.steps || 158,
       durationStr: `${timeStr} (${totalSec} mp)`,
       durationSec: totalSec,
@@ -1063,7 +1153,8 @@
       cadence: '50 lépés/p',
       activeDurationStr: `${activeSec} mp (${Math.floor(activeSec / 60)}p ${activeSec % 60}mp)`,
       waypointsCount: state.waypoints.length,
-      note: `Másodperc alapon rögzített séta. Összesen ${totalSec} mp, ebből ${restSec} mp pihenő.`,
+      note: `Másodperc alapon rögzített séta. Összesen ${totalSec} mp, ebből ${restSec} mp pihenő.` +
+            (state.stickMeters > 0 ? ` 🦯 Bottal: ${Math.round(state.stickMeters)} m, nélküle: ${Math.round(state.noStickMeters)} m.` : ' 🚶 Végig bot nélkül.'),
       tags: ['#mai_séta', '#másodperc_alapú'],
       path: pathData,
       // Másodperc alapú eseménylista a visszanézéshez
@@ -1139,6 +1230,8 @@
         stateBadge.textContent = 'Készenlét';
       }
     }
+
+    updateStickButtonUI();
   }
 
   // ==========================================================================
@@ -1555,14 +1648,16 @@
     const weeklyChangeEl = document.getElementById('fit-weekly-change');
     const strengthEl = document.getElementById('strength-pct-val');
 
-    const lastRoute = state.selectedRoute || state.savedRoutes[0];
-    const lastMeters = lastRoute ? lastRoute.meters : 110;
+    const lastRoute = state.selectedRoute || (state.savedRoutes.length > 0 ? state.savedRoutes[0] : null);
+    const hasData = !!lastRoute || state.meters > 0 || state.isDemoMode;
+
+    const lastMeters = lastRoute ? lastRoute.meters : (state.meters > 0 ? state.meters : (state.isDemoMode ? 110 : 0));
     const calories = Math.round(lastMeters * 0.35);
 
     if (calEl) calEl.textContent = `${calories} kcal`;
-    if (dailyChangeEl) dailyChangeEl.textContent = '+9.5%';
-    if (weeklyChangeEl) weeklyChangeEl.textContent = '+14.2%';
-    if (strengthEl) strengthEl.textContent = '+16.4%';
+    if (dailyChangeEl) dailyChangeEl.textContent = hasData ? '+9.5%' : '—';
+    if (weeklyChangeEl) weeklyChangeEl.textContent = hasData ? '+14.2%' : '—';
+    if (strengthEl) strengthEl.textContent = hasData ? '+16.4%' : '0.0%';
   }
 
   // ==========================================================================
@@ -2150,14 +2245,21 @@
         const goalType = document.getElementById('set-target-goal-type')?.value;
         const stepLength = parseInt(document.getElementById('set-step-length')?.value, 10);
         const pauseMode = document.getElementById('set-pause-blink')?.value;
+        const stickMode = document.getElementById('set-stick-mode')?.value || 'START_WITHOUT';
 
         state.settings = {
           restThresholdSec: restThreshold > 0 ? restThreshold : 60,
           targetGoalVal: goalVal > 0 ? goalVal : 500,
           targetGoalType: goalType || 'meters',
           stepLengthCm: stepLength || 65,
-          pauseBlinkMode: pauseMode || 'pulse'
+          pauseBlinkMode: pauseMode || 'pulse',
+          stickMode: stickMode
         };
+
+        if (state.walkStatus === 'IDLE' || state.walkStatus === 'STOPPED') {
+          state.isUsingStick = (stickMode === 'ALWAYS' || stickMode === 'START_WITH');
+          updateStickButtonUI();
+        }
 
         localStorage.setItem('csampazo_settings', JSON.stringify(state.settings));
         updateQuickGoalAndRestDisplay();
@@ -2574,6 +2676,7 @@
     }
     updateSummaryScreen(state.selectedRoute);
     updateProgressScreen();
+    renderLevelLadder();
   }
 
   // ==========================================================================
