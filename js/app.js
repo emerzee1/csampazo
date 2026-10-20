@@ -5265,11 +5265,31 @@
       });
     }
 
-    // 2. PWA Telepítés gomb eseménykezelő
+    // 2. APK Telepítés & PWA kezelő
+    const btnApk = document.getElementById('btn-apk-install');
+    const apkCard = document.getElementById('apk-download-card');
+    const btnApkSettings = document.getElementById('btn-apk-settings-download');
     const btnPwa = document.getElementById('btn-pwa-install');
     const modalPwa = document.getElementById('modal-pwa-help');
     const btnClosePwa = document.getElementById('btn-close-pwa-help');
     const btnAckPwa = document.getElementById('btn-ack-pwa-help');
+
+    if (window.AndroidBridge) {
+      if (btnApk) btnApk.style.display = 'none';
+      if (apkCard) apkCard.style.display = 'none';
+      if (btnPwa) btnPwa.style.display = 'none';
+    } else {
+      if (btnApk) {
+        btnApk.addEventListener('click', () => {
+          showToast('Csámpázó APK letöltése elindult... Telepítéshez nyisd meg az értesítést a telefonon! 📱', '⬇️');
+        });
+      }
+      if (btnApkSettings) {
+        btnApkSettings.addEventListener('click', () => {
+          showToast('Csámpázó APK letöltése elindult... Telepítéshez nyisd meg az értesítést a telefonon! 📱', '⬇️');
+        });
+      }
+    }
 
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
