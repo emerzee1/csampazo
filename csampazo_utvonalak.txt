@@ -1,0 +1,4 @@
+# ========================================================
+# CSÁMPÁZÓ - SM KÍMÉLŐ SÉTAÚTVONALAK (csampazo_utvonalak.txt)
+# Sclerosis Multiplex betegek számára válogatott, akadálymentes séták pihenőpadokkal
+# ========================================================

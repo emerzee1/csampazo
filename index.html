@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Csámpázó - SM Sétakövető & Rehabilitációs Rendszer</title>
+  
+  <meta name="description" content="Csámpázó Sétakövető és Útpont Rögzítő Alkalmazás Sclerosis Multiplex Betegek Számára">
+  <meta name="theme-color" content="#070c16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Csámpázó">
+  
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/leaflet.css">
+</head>
+<body id="app-body">
+
+  <!-- ==========================================================================
+       LEBEGŐ GYORSVEZÉRLŐK: BAL FELSŐ (?) ÉS JOBB FELSŐ (💡)
+       ========================================================================== -->
+  <button type="button" class="floating-corner-btn btn-float-left" id="btn-float-help" aria-label="Használati utasítás (hosszan nyomva)" title="Használati utasítás (hosszan tartsd nyomva)">
+    <span class="btn-float-icon">?</span>
+  </button>
+
+  <button type="button" class="floating-corner-btn btn-float-right" id="btn-float-torch" aria-label="Vaku lámpa (hosszan bekapcsol, rábökve kikapcsol)" title="Vaku lámpa (hosszan tartsd nyomva)">
+    <span class="btn-float-icon">💡</span>
+  </button>
+
+  <!-- ==========================================================================
+       GPS JELVÉTELI KERET-VISSZAJELZŐ (Piros villogás kereséskor, zöld fix esetén)
+       ========================================================================== -->
+  <div id="gps-edge-indicator" class="gps-edge-indicator gps-idle" aria-hidden="true"></div>
+
+  <!-- ==========================================================================
+       PAUSE VILLOGÓ ÉRTESÍTÉSI SÁV (Pause alatt villog az egész képernyő!)
+       ========================================================================== -->
+  <div class="pause-alert-banner" id="pause-alert-banner">
+    <div class="pause-alert-content">
+      <span class="pause-icon">⏸️</span>
+      <strong>A SÉTA SZÜNETELTETVE (PAUSE AKTÍV)</strong>
+      <span class="pause-hint">— Kattints a Kezdés vagy Pause gombra a folytatáshoz!</span>
+    </div>
+  </div>
+
+  <div class="main-screen-container">
+    
+    <!-- ==========================================================================
+         1. KÉPERNYŐ: CSAK FELVÉTEL
+         Élő térkép csiganyállal, aktuális tartózkodási hely, felvételi vezérlők
+         ========================================================================== -->
+    <main class="view-screen active" id="screen-live">
+      
+      <!-- FELSŐ SÁV: IDŐ, DÁTUM, GPS ÁLLAPOT & LOGÓ -->
+      <header class="top-status-bar">
+        <div class="app-brand-box">
+          <img src="icons/icon.svg" alt="Csámpázó Logo" class="app-logo-img">
+          <div class="brand-text-wrap">
+            <h1 class="app-title">Csámpázó</h1>
+            <span class="app-sub">Sétakövető</span>
+          </div>
+        </div>
+
+        <div class="time-date-panel">
+          <div class="live-clock" id="live-clock">11:35:16</div>
+          <div class="live-date" id="live-date">2026. október 18., vasárnap</div>
+        </div>
+
+        <div class="gps-status-panel" id="gps-status-panel">
+          <div class="gps-indicator-row">
+            <span class="gps-dot active" id="gps-dot"></span>
+            <span class="gps-title" id="gps-title">GPS: Keresés...</span>
+            <span class="gps-acc-badge" id="gps-acc-badge">(Műhold keresés...)</span>
+          </div>
+          <div class="gps-details-row">
+            <span id="gps-coords-text">47.525750° N, 19.051680° E</span>
+            <span class="gps-sat-info" id="gps-sat-info">• 14 műhold</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- MOBIL & PWA VEZÉRLŐSÁV -->
+      <section class="mobile-pwa-bar" id="mobile-pwa-bar">
+        <div class="pwa-mode-toggle-group">
+          <button type="button" class="mode-pill-btn active" id="btn-mode-real-gps" title="Telefon valós hardveres GPS használata">
+            <span class="mode-icon">📡</span> Valós GPS
+          </button>
+          <button type="button" class="mode-pill-btn" id="btn-mode-sim-gps" title="Virtuális teszt séta">
+            <span class="mode-icon">🎮</span> Szimuláció
+          </button>
+        </div>
+
+        <div class="pwa-action-group">
+          <span class="wakelock-pill active" id="wakelock-pill" title="Képernyő ébrentartva a mérés alatt">
+            💡 Kijelző ébren
+          </span>
+        </div>
+      </section>
+
+      <!-- TELEMETRIA SÁV (ÁLLAPOT, MÉTER, IDŐ, LÉPÉS, ÚTPONTOK) -->
+      <section class="status-telemetry-bar">
+        <div class="telemetry-col">
+          <span class="t-label">Állapot</span>
+          <span class="t-val status-badge" id="live-state-badge">Készenlét</span>
+        </div>
+        <div class="telemetry-col">
+          <span class="t-label">Megtett táv</span>
+          <span class="t-val t-distance" id="live-distance">0 m</span>
+        </div>
+        <div class="telemetry-col">
+          <span class="t-label">Időtartam (mp)</span>
+          <span class="t-val" id="live-timer">00:00 (0 mp)</span>
+        </div>
+        <div class="telemetry-col">
+          <span class="t-label">Lépésszám</span>
+          <span class="t-val" id="live-steps">0 lépés</span>
+        </div>
+        <div class="telemetry-col">
+          <span class="t-label">Útpontok</span>
+          <span class="t-val" id="live-waypoint-count">0 db</span>
+        </div>
+      </section>
+
+      <!-- ÉLŐ SÉTA TÉRKÉP (CSIGANYÁLLAL ÉS VALÓS POZÍCIÓVAL) -->
+      <section class="map-section-card">
+        <div class="map-header-bar">
+          <div class="map-title">
+            <span>🗺️</span> <strong>Élő Séta Térkép</strong> <span style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);">(Valós pozíció & Csiganyál)</span>
+          </div>
+          <div class="map-actions">
+            <button type="button" class="btn-subtle" id="btn-recenter" title="Középre állítás">🎯 Középre</button>
+            <div class="map-layer-switch-box" id="live-map-layer-switcher">
+              <button type="button" class="layer-pill-btn active" data-layer="street" id="btn-live-layer-street"><span>🗺️</span> <span>Utca</span></button>
+              <button type="button" class="layer-pill-btn" data-layer="satellite" id="btn-live-layer-satellite"><span>🛰️</span> <span>Műhold</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="map-canvas-wrap">
+          <div id="main-track-map"></div>
+        </div>
+      </section>
+
+      <!-- ERGONOMIKUS ÉS ÁTTEKINTHETŐ FELVÉTELI VEZÉRLŐ GOMBOK -->
+      <section class="live-controls-grid">
+        <!-- Felső sor: Kezdés, Pause, Vége -->
+        <div class="live-controls-row-top">
+          <button type="button" class="action-btn-stacked btn-start" id="btn-action-start">
+            <span class="btn-icon">▶</span>
+            <span class="btn-label">Kezdés</span>
+          </button>
+          <button type="button" class="action-btn-stacked btn-pause" id="btn-action-pause">
+            <span class="btn-icon">⏸</span>
+            <span class="btn-label">Pause</span>
+          </button>
+          <button type="button" class="action-btn-stacked btn-stop" id="btn-action-stop">
+            <span class="btn-icon">⏹</span>
+            <span class="btn-label">Vége</span>
+          </button>
+        </div>
+
+        <!-- Alsó sor: Bot használat kapcsoló és Útpont rögzítés -->
+        <div class="live-controls-row-bottom">
+          <button type="button" class="action-btn-stacked btn-stick-toggle" id="btn-action-stick">
+            <span class="btn-icon">🦯</span>
+            <span class="btn-label" id="btn-stick-label">Bot: NEM</span>
+            <span class="btn-hint" id="btn-stick-hint">Kattints a bekapcsoláshoz</span>
+          </button>
+          <button type="button" class="action-btn-stacked btn-waypoint" id="btn-action-waypoint">
+            <span class="btn-icon">📍</span>
+            <span class="btn-label">Útpont rögzítése</span>
+            <span class="btn-hint">Pozíció elmentése útpontként</span>
+          </button>
+        </div>
+
+        <!-- Élő Bottal / Bot nélkül méterszámláló séta közben -->
+        <div class="stick-live-strip" id="stick-live-strip" style="display:none;">
+          <div class="stick-strip-pill">
+            <span class="pill-icon">🚶</span>
+            <span>Bot nélkül: <strong id="live-dist-no-stick" style="color:var(--accent-mint);">0 m</strong></span>
+          </div>
+          <div class="stick-strip-divider"></div>
+          <div class="stick-strip-pill">
+            <span class="pill-icon">🦯</span>
+            <span>Bottal: <strong id="live-dist-stick" style="color:var(--accent-gold, #fbbf24);">0 m</strong></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- NAPI CÉL ÉS PIHENŐ KÜSZÖB GYORSSÁV -->
+      <section class="goal-rest-quick-bar">
+        <div class="goal-params-group">
+          <div class="quick-param-badge">
+            <span class="p-label">🎯 Cél:</span>
+            <span class="p-val" id="quick-disp-target-goal">500 m</span>
+            <button type="button" class="btn-quick-edit-param" id="btn-quick-edit-goal" title="Cél módosítása">✏️ Módosítás</button>
+          </div>
+          <div class="quick-param-badge">
+            <span class="p-label">⏸️ Pihenő Küszöb:</span>
+            <span class="p-val" id="quick-disp-rest-threshold">60 mp</span>
+            <button type="button" class="btn-quick-edit-param" id="btn-quick-edit-rest" title="Pihenőidő küszöb módosítása">✏️ Módosítás</button>
+          </div>
+        </div>
+        <div style="font-size:0.85rem; color:var(--text-muted);" id="quick-goal-progress-text">
+          Teljesítve: <strong style="color:var(--accent-mint);" id="quick-goal-progress-val">0 m / 500 m (0%)</strong>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ==========================================================================
+         2. KÉPERNYŐ: ÚTVONALLISTA (MENTÉSI ABLAKKAL, KIVÁLASZTÁSSAL)
+         ========================================================================== -->
+    <main class="view-screen" id="screen-history">
+      
+      <section class="history-walks-card">
+        <div class="history-walks-header">
+          <div style="display:flex; align-items:center; gap:0.5rem;">
+            <span style="font-size:1.5rem;">📜</span>
+            <div>
+              <h2 style="margin:0; font-size:1.25rem; color:#fff;">Mentett Útvonalak</h2>
+              <p style="margin:0.2rem 0 0 0; font-size:0.8rem; color:var(--text-muted);">Válaszd ki az elemezni vagy menteni kívánt sétát</p>
+            </div>
+          </div>
+          <span class="wp-radius-badge" id="history-routes-count">0 mentett séta</span>
+        </div>
+
+        <!-- HETI NAPTÁR (SZŰRÉS DÁTUM SZERINT) -->
+        <div class="weekly-calendar-card" style="margin-top:0.75rem; border:none; padding:0; background:transparent;">
+          <div class="calendar-header-row" style="margin-bottom:0.4rem;">
+            <span style="font-size:0.85rem; color:var(--text-muted); font-weight:700;">📅 Dátumszűrő:</span>
+            <button type="button" class="btn-subtle" id="btn-calendar-show-all">Összes nap megjelenítése</button>
+          </div>
+          <div class="calendar-days-grid" id="calendar-days-grid">
+            <!-- Dinamikusan generált heti naptár nap-gombok -->
+          </div>
+        </div>
+
+        <!-- LISTA A MENTETT ÚTVONALAKRÓL -->
+        <div class="walks-timeline-list" id="walks-timeline-list" style="margin-top:0.75rem;">
+          <!-- Dinamikus mentett útvonal kártyák időrendi csökkenő sorrendben -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ==========================================================================
+         3. KÉPERNYŐ: KIVÁLASZTOTT ÚTVONAL ELEMZÉSE (TÉRKÉPPEL, ELEMZÉSEKKEL)
+         ========================================================================== -->
+    <main class="view-screen" id="screen-summary">
+      
+      <section class="summary-overview-card">
+        <!-- ELEMZÉS FEJLÉC ÉS GYORS MENTÉSI / KEZELÉSI GOMBOK -->
+        <div class="summary-header-row">
+          <div class="summary-title-wrap">
+            <h2 id="sum-route-title">Kiválasztott Séta</h2>
+            <p id="sum-route-meta">Részletes másodperc alapú kimutatás és térkép</p>
+          </div>
+          <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+            <button type="button" class="btn-subtle" id="btn-sum-open-gpx" style="color:var(--accent-cyan); border-color:rgba(56,189,248,0.5); font-weight:700;" title="GPX fájl megnyitása külső térképpel (OsmAnd)">
+              <span>📂</span> <span>GPX Megnyitás</span>
+            </button>
+            <button type="button" class="btn-subtle" id="btn-sum-save-gpx" style="color:var(--accent-mint); border-color:rgba(52,211,153,0.5);" title="GPX mentése a Download/csampazo mappába">
+              <span>💾</span> <span>Mentés</span>
+            </button>
+            <button type="button" class="btn-subtle" id="btn-sum-jump-history" title="Vissza az útvonallistához">
+              <span>📜</span> <span>Útvonallista</span>
+            </button>
+            <button type="button" class="btn-subtle" id="btn-sum-delete-route" style="color:#f87171; border-color:rgba(239,68,68,0.4);" title="Útvonal törlése">
+              <span>🗑️</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 1. KIVÁLASZTOTT ÚTVONAL TÉRKÉPEN -->
+        <div class="map-section-card" style="margin-top:0.85rem;">
+          <div class="map-header-bar">
+            <div class="map-title">
+              <span>🗺️</span> <span id="history-map-title">Kiválasztott Útvonal Térképen</span>
+            </div>
+            <div class="map-actions">
+              <button type="button" class="btn-subtle" id="btn-history-fit" title="Teljes útvonal nézet">🔍 Teljes Út</button>
+              <div class="map-layer-switch-box" id="history-map-layer-switcher">
+                <button type="button" class="layer-pill-btn active" data-layer="street" id="btn-history-layer-street"><span>🗺️</span> <span>Utca</span></button>
+                <button type="button" class="layer-pill-btn" data-layer="satellite" id="btn-history-layer-satellite"><span>🛰️</span> <span>Műhold</span></button>
+              </div>
+            </div>
+          </div>
+          <div class="map-canvas-wrap">
+            <div id="history-track-map"></div>
+          </div>
+        </div>
+
+        <!-- 2. 6-OS FŐMETRIKA RÁCS (MÁSODPERC PONTOSSÁGGAL) -->
+        <div class="summary-metrics-grid" style="margin-top:0.85rem;">
+          <!-- 1. Hossz -->
+          <div class="sum-metric-card">
+            <div class="sum-metric-header">
+              <span>Hossz (Távolság)</span>
+              <span>📏</span>
+            </div>
+            <div class="sum-metric-val" id="sum-metric-distance">0 m</div>
+            <div class="sum-metric-sub">Napi célhoz viszonyítva</div>
+          </div>
+
+          <!-- 2. Lépésszám -->
+          <div class="sum-metric-card">
+            <div class="sum-metric-header">
+              <span>Lépésszám</span>
+              <span>👟</span>
+            </div>
+            <div class="sum-metric-val" id="sum-metric-steps">0 lépés</div>
+            <div class="sum-metric-sub" id="sum-metric-steplen">Mért lépéshossz: —</div>
+          </div>
+
+          <!-- 3. Sebesség -->
+          <div class="sum-metric-card">
+            <div class="sum-metric-header">
+              <span>Átlagsebesség</span>
+              <span>⚡</span>
+            </div>
+            <div class="sum-metric-val" id="sum-metric-speed">0.0 km/h</div>
+            <div class="sum-metric-sub">Járástempó átlag</div>
+          </div>
+
+          <!-- 4. PIHENŐK SZÁMA (SM SZABÁLY) -->
+          <div class="sum-metric-card card-highlight-rest">
+            <div class="sum-metric-header">
+              <span style="color:#fbbf24;">Pihenők száma</span>
+              <span>🪑</span>
+            </div>
+            <div class="sum-metric-val" id="sum-metric-rests">0 pihenő</div>
+            <div class="rest-rule-badge">
+              ⚠️ <strong>SM Szabály:</strong> Küszöb: <span id="sum-rule-threshold-text">60 mp</span> feletti megállás!
+            </div>
+            <div class="sum-metric-sub" id="sum-metric-rest-duration" style="margin-top:0.35rem; color:#fde68a;">
+              Pihenőidő összesen: 0 mp
+            </div>
+          </div>
+
+          <!-- 5. Emelkedés -->
+          <div class="sum-metric-card">
+            <div class="sum-metric-header">
+              <span>Emelkedés (+m)</span>
+              <span>📈</span>
+            </div>
+            <div class="sum-metric-val" id="sum-metric-elevation">+0 m</div>
+            <div class="sum-metric-sub">Burkolati szintkülönbség</div>
+          </div>
+
+          <!-- 6. Süllyedés -->
+          <div class="sum-metric-card">
+            <div class="sum-metric-header">
+              <span>Süllyedés (-m)</span>
+              <span>📉</span>
+            </div>
+            <div class="sum-metric-val" id="sum-metric-descent">-0 m</div>
+            <div class="sum-metric-sub">Lejtési szakasz</div>
+          </div>
+        </div>
+
+        <!-- 3. IDŐ- ÉS MOZGÁSKIMUTATÁSOK -->
+        <div class="summary-extra-box" style="margin-top:0.85rem;">
+          <h3><span>🔬</span> Másodperc Alapú Idő- és Mozgáskimutatások</h3>
+          <div class="extra-metrics-strip">
+            <div class="extra-item">
+              <div class="e-label">Összidő (mp)</div>
+              <div class="e-val" id="sum-extra-total-time" style="color:var(--accent-cyan);">0 mp (00:00)</div>
+            </div>
+            <div class="extra-item">
+              <div class="e-label">Aktív Mozgásidő</div>
+              <div class="e-val" id="sum-extra-active-time" style="color:var(--accent-mint);">0 mp (00:00)</div>
+            </div>
+            <div class="extra-item">
+              <div class="e-label">Pihenőidő (mp)</div>
+              <div class="e-val" id="sum-extra-rest-time" style="color:#fbbf24;">0 mp (00:00)</div>
+            </div>
+            <div class="extra-item">
+              <div class="e-label">Lépésritmus</div>
+              <div class="e-val" id="sum-extra-cadence">0 lépés/p</div>
+            </div>
+            <div class="extra-item">
+              <div class="e-label">Mért Lépéshossz</div>
+              <div class="e-val" id="sum-extra-steplen" style="color:var(--accent-gold);">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. SEBESSÉG SZÍNVONAL ÉS JELMAGYARÁZAT -->
+        <div class="summary-speed-box" style="margin-top:0.85rem;">
+          <div class="summary-speed-header">
+            <h3><span>⚡</span> Sebesség a Séta Alatt (Színkódolt Vonal)</h3>
+            <span class="speed-avg-badge" id="sum-speed-avg-badge">Átlag: 0.0 km/h</span>
+          </div>
+          <div class="speed-line-wrapper">
+            <div class="speed-line-bar" id="speed-line-bar" title="Kattints a szakaszokra a sebességért"></div>
+            <div class="speed-line-axis">
+              <span>0% (Rajt)</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100% (Cél)</span>
+            </div>
+          </div>
+          <div class="speed-legend-container" id="speed-legend-container">
+            <div class="speed-legend-pill">
+              <span class="speed-color-dot dot-rest"></span>
+              <span class="speed-label"><strong>0.0 km/h</strong>Állás / Pihenő</span>
+            </div>
+            <div class="speed-legend-pill">
+              <span class="speed-color-dot dot-slow"></span>
+              <span class="speed-label"><strong>0.1 – 1.5 km/h</strong>Lassú séta</span>
+            </div>
+            <div class="speed-legend-pill">
+              <span class="speed-color-dot dot-normal"></span>
+              <span class="speed-label"><strong>1.6 – 3.0 km/h</strong>Normál séta</span>
+            </div>
+            <div class="speed-legend-pill">
+              <span class="speed-color-dot dot-fast"></span>
+              <span class="speed-label"><strong>&gt; 3.0 km/h</strong>Tempós séta</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. SM LÉPÉSHOSSZ ELEMZÉS ÉS JÁRÁSDINAMIKA -->
+        <div class="summary-steplen-box" style="margin-top:0.85rem;">
+          <div class="summary-steplen-header">
+            <h3><span>📐</span> Mért Lépéshossz & SM Járásdinamika Elemzés</h3>
+            <span class="steplen-avg-badge" id="sum-steplen-avg-badge">Mért átlag: —</span>
+          </div>
+          <p class="steplen-desc-note">
+            Az SM-ben a lépéshossz folyamatosan változó érték (nem fix konstans): a valós távolság és lépésszám arányából pontosan mérve, a fáradás és járásbiztonság kimutatásához.
+          </p>
+
+          <!-- Fő lépéshossz metrikák -->
+          <div class="steplen-metrics-grid">
+            <div class="steplen-card">
+              <span class="steplen-card-label">Mért Átlag</span>
+              <div class="steplen-card-val" id="sum-steplen-main-val" style="color:var(--accent-gold);">—</div>
+              <span class="steplen-card-sub" id="sum-steplen-main-sub">Távolság / Lépések</span>
+            </div>
+            <div class="steplen-card">
+              <span class="steplen-card-label">Séta 1. Fele</span>
+              <div class="steplen-card-val" id="sum-steplen-half1-val" style="color:var(--accent-mint);">—</div>
+              <span class="steplen-card-sub">Kezdeti lépéshossz</span>
+            </div>
+            <div class="steplen-card">
+              <span class="steplen-card-label">Séta 2. Fele</span>
+              <div class="steplen-card-val" id="sum-steplen-half2-val" style="color:var(--accent-cyan);">—</div>
+              <span class="steplen-card-sub">Fáradási szakasz</span>
+            </div>
+            <div class="steplen-card">
+              <span class="steplen-card-label">Fáradási Eltérés</span>
+              <div class="steplen-card-val" id="sum-steplen-diff-val" style="color:#fff;">—</div>
+              <span class="steplen-card-sub" id="sum-steplen-diff-sub">Lépéshossz stabilitás</span>
+            </div>
+          </div>
+
+          <!-- Lépéshossz dinamika & összehasonlító sávok -->
+          <div class="steplen-dynamics-wrap">
+            <div class="steplen-dyn-title">
+              <span>📊 Séta Eleje vs. Vége Lépéshossz Összehasonlítás</span>
+              <span id="sum-steplen-cadence-info" style="font-size:0.75rem; color:var(--text-muted);">— lépés/perc</span>
+            </div>
+            <div class="steplen-bars-container">
+              <div class="steplen-bar-row">
+                <span class="steplen-bar-label">Séta Eleje</span>
+                <div class="steplen-bar-track">
+                  <div class="steplen-bar-fill" id="sum-steplen-bar-half1" style="width: 0%; background: var(--accent-mint);"></div>
+                </div>
+                <span class="steplen-bar-val" id="sum-steplen-bar-half1-val">—</span>
+              </div>
+              <div class="steplen-bar-row">
+                <span class="steplen-bar-label">Séta Vége</span>
+                <div class="steplen-bar-track">
+                  <div class="steplen-bar-fill" id="sum-steplen-bar-half2" style="width: 0%; background: var(--accent-gold);"></div>
+                </div>
+                <span class="steplen-bar-val" id="sum-steplen-bar-half2-val">—</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bot használat szerinti kimutatás (ha volt) -->
+          <div id="sum-steplen-stick-card" style="display:none; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:var(--radius-sm); padding:0.75rem 0.85rem;">
+            <div style="font-size:0.78rem; font-weight:800; color:#fff; display:flex; justify-content:space-between; align-items:center;">
+              <span>🦯 Bot Használat Hatása a Lépéshosszra</span>
+              <span id="sum-steplen-stick-badge" style="color:var(--accent-cyan); font-size:0.75rem;">Mért adat</span>
+            </div>
+            <div id="sum-steplen-stick-desc" style="font-size:0.78rem; color:var(--text-muted); margin-top:0.35rem; line-height:1.4;">
+            </div>
+          </div>
+
+          <!-- Orvosi / Gyógytornász SM Járáskép visszajelzés -->
+          <div class="steplen-insight-badge good" id="sum-steplen-insight">
+            <span>ℹ️</span>
+            <div id="sum-steplen-insight-text">Séta adatok betöltése...</div>
+          </div>
+        </div>
+
+        <!-- 6. MÁSODPERC ALAPÚ ESEMÉNY-IDŐVONAL -->
+        <div class="seconds-timeline-box" style="margin-top:0.85rem;">
+          <div class="sec-timeline-header">
+            <h3><span>⏱️</span> Másodperc Alapú Esemény-Idővonal (Visszanézés)</h3>
+            <span class="sec-total-badge" id="sec-timeline-total-badge">Összesen: 0 másodperc</span>
+          </div>
+          <div class="sec-timeline-segments-bar" id="sec-timeline-segments-bar"></div>
+          <div class="sec-events-list" id="sec-events-list"></div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- ==========================================================================
+         4. KÉPERNYŐ: ÚTPONTKEZELÉS
+         ========================================================================== -->
+    <main class="view-screen" id="screen-waypoints">
+      
+      <section class="waypoint-management-card">
+        <div class="wp-mgmt-header">
+          <div>
+            <h2 style="margin:0; font-size:1.25rem; color:#fff;"><span>📍</span> Útpont Kezelés</h2>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-top:0.25rem;">
+              Padok, ivókutak, akadálymentes helyek és egyéni megállók kezelése
+            </p>
+          </div>
+          <div class="wp-mgmt-actions" style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button type="button" class="btn-subtle" id="btn-mgmt-new-tag">🏷️ + Új Címke</button>
+            <button type="button" class="btn-add-wp-trigger" id="btn-mgmt-add-wp">
+              <span>+</span> <span>Új Útpont</span>
+            </button>
+            <button type="button" class="btn-subtle" id="btn-mgmt-clear-all-wps" style="color:#f87171; border-color:rgba(239,68,68,0.4);" title="Az összes útpont azonnali törlése">
+              <span>🗑️</span> <span>Összes Törlése</span>
+            </button>
+            <button type="button" id="btn-quick-waypoint-trigger" style="display:none;"></button>
+          </div>
+        </div>
+
+        <!-- Címkék és Kedvencek Csoportosító Sáv -->
+        <div class="wp-groups-bar" id="wp-mgmt-groups-bar" style="margin-top:0.85rem;">
+          <button type="button" class="group-tab-btn active" data-group="all">Összes útpont</button>
+          <button type="button" class="group-tab-btn" data-group="fav">⭐ Csak Kedvencek</button>
+          <button type="button" class="group-tab-btn" data-group="Pad">🪑 Padok</button>
+          <button type="button" class="group-tab-btn" data-group="Ivókút">💧 Ivókutak</button>
+          <button type="button" class="group-tab-btn" data-group="Akadálymentes">♿ Akadálymentes</button>
+          <button type="button" class="group-tab-btn" data-group="Árnyék">🌳 Árnyék</button>
+          <button type="button" class="group-tab-btn" data-group="Rózsakert">🌸 Rózsakert</button>
+        </div>
+
+        <!-- Címkeszűrők kompatibilitáshoz -->
+        <div class="wp-filter-chips-bar" id="wp-filter-chips-bar" style="display:none;">
+          <button type="button" class="filter-chip-btn active" data-filter="all">Összes</button>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.85rem;">
+          <span class="wp-radius-badge" id="wp-radius-badge"><span id="wp-count-in-range">0</span> mentett útpont</span>
+        </div>
+
+        <!-- Útpontok listája -->
+        <div class="wp-manage-items-list" id="wp-manage-items-list" style="margin-top:0.6rem;">
+          <!-- Dinamikus szerkeszthető sorok -->
+        </div>
+
+        <!-- Rács kompatibilitás -->
+        <div class="waypoints-grid-container" id="waypoints-container" style="display:none;"></div>
+
+      </section>
+
+    </main>
+
+    <!-- ==========================================================================
+         5. KÉPERNYŐ: BEÁLLÍTÁSOK
+         (SM beállítások, Fejlődés & Szintek, Adatkezelés: Import/Export, Google Drive)
+         ========================================================================== -->
+    <main class="view-screen" id="screen-settings">
+      
+      <section class="settings-main-card">
+        
+        <!-- 1. SM ÉS SZEMÉLYES BEÁLLÍTÁSOK -->
+        <div>
+          <h2 class="settings-section-title">
+            <span>⚙️</span> SM Rehabilitációs & Séta Beállítások
+          </h2>
+          <form id="settings-form" class="settings-form-grid" style="margin-top:0.85rem;">
+            
+            <!-- Pihenőidő küszöbérték másodpercben -->
+            <div class="s-field">
+              <label for="set-rest-threshold-input">Pihenőidő küszöbérték (másodperc)</label>
+              <div style="display:flex; gap:0.5rem; width:100%; box-sizing:border-box;">
+                <input type="number" id="set-rest-threshold-input" min="10" max="600" step="5" value="60" required style="flex:1; min-width:0; box-sizing:border-box;">
+                <span style="display:flex; align-items:center; color:var(--text-muted); font-weight:800; padding:0 0.5rem; flex-shrink:0;">mp</span>
+              </div>
+              <small style="color:var(--text-dim); font-size:0.75rem;">Ennél hosszabb egy helyben állás számít hivatalos SM pihenőnek (alapértelmezett: 60 mp).</small>
+            </div>
+
+            <!-- Napi cél távolság vagy lépés -->
+            <div class="s-field">
+              <label for="set-target-goal-val">Napi SM Cél</label>
+              <div style="display:flex; gap:0.5rem; width:100%; box-sizing:border-box;">
+                <input type="number" id="set-target-goal-val" min="10" max="10000" step="10" value="500" required style="flex: 1; min-width: 0; box-sizing:border-box;">
+                <select id="set-target-goal-type" style="flex: 0 0 115px; max-width: 125px; box-sizing:border-box;">
+                  <option value="meters" selected>Méter (m)</option>
+                  <option value="steps">Lépés</option>
+                </select>
+              </div>
+              <small style="color:var(--text-dim); font-size:0.75rem;">Szabadon beállítható cél (pl. 100 m, 500 m, vagy 1000 lépés).</small>
+            </div>
+
+            <div class="s-field" style="background:rgba(255,255,255,0.03); padding:0.65rem 0.85rem; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.06);">
+              <label style="color:var(--accent-gold); font-size:0.8rem; margin-bottom:0.25rem; display:block;">📐 Lépéshossz: Kizárólag Mért Eredmény</label>
+              <small style="color:var(--text-dim); font-size:0.75rem; line-height:1.4; display:block;">
+                Az SM-ben a lépéshossz folyamatosan változik a fáradás és járásbiztonság miatt. Nincs szükség kézi megadásra; a rendszer a séták valós távolságából és lépéseiből dinamikusan méri és elemzi.
+              </small>
+            </div>
+
+            <div class="s-field">
+              <label for="set-pause-blink">Pause Villogási Mód</label>
+              <select id="set-pause-blink">
+                <option value="pulse" selected>Teljes sárga villogás</option>
+                <option value="banner">Felső sárga sáv</option>
+              </select>
+            </div>
+
+            <!-- Bot alapértelmezett indítási beállítása -->
+            <div class="s-field" style="grid-column: 1 / -1;">
+              <label for="set-stick-mode">🦯 Bot Használat Alapbeállítása</label>
+              <select id="set-stick-mode">
+                <option value="START_WITHOUT" selected>Induláskor bot nélkül</option>
+                <option value="START_WITH">Induláskor bottal</option>
+                <option value="ALWAYS">Mindig bottal</option>
+              </select>
+              <small style="color:var(--text-dim); font-size:0.75rem;">Hogyan induljon a bot állapota az új séta megkezdésekor.</small>
+            </div>
+
+            <!-- Leállítás emlékeztető csippanás időköz (mp) -->
+            <div class="s-field" style="grid-column: 1 / -1; background:rgba(56, 189, 248, 0.05); padding:0.75rem 0.85rem; border-radius:var(--radius-sm); border:1px solid rgba(56, 189, 248, 0.15);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.35rem;">
+                <label for="set-reminder-interval-input" style="color:var(--accent-cyan, #38bdf8); font-weight:700; margin:0;">
+                  🔔 Leállítás Emlékeztető Csippanás
+                </label>
+                <button type="button" class="btn-subtle" id="btn-test-reminder-chirp" style="padding:0.25rem 0.6rem; font-size:0.75rem; border-color:rgba(56,189,248,0.4); color:var(--accent-cyan, #38bdf8);" title="Próba hang lejátszása">
+                  🔊 Teszt csippanás
+                </button>
+              </div>
+              <div style="display:flex; gap:0.5rem; width:100%; box-sizing:border-box;">
+                <input type="number" id="set-reminder-interval-input" min="0" max="3600" step="5" value="0" placeholder="0 = kikapcsolva" style="flex:1; min-width:0; box-sizing:border-box;">
+                <span style="display:flex; align-items:center; color:var(--text-muted); font-weight:800; padding:0 0.5rem; flex-shrink:0;">mp</span>
+              </div>
+              <small style="color:var(--text-dim); font-size:0.75rem; line-height:1.4; display:block; margin-top:0.35rem;">
+                A megadott időközönként (másodpercben, pl. 30, 60, 120 mp) változó hangmagasságú csippanást játszik le, hogy otthon ne felejtsd el leállítani az alkalmazást. <strong>0 mp = kikapcsolva.</strong>
+              </small>
+            </div>
+
+            <div class="s-field" style="grid-column: 1 / -1; margin-top:0.4rem;">
+              <button type="submit" class="btn-modal-save" style="width:100%;">
+                <span>💾</span> <span>Beállítások Mentése</span>
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+        <!-- 2. FEJLŐDÉS, FITNESS & SZINTLÉPÉSEK KÁRTYA -->
+        <div style="margin-top:1.5rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1.25rem;">
+          <h2 class="settings-section-title">
+            <span>📈</span> Fejlődés, Fitness & Szintlépéses Rendszer
+          </h2>
+
+          <!-- SZINTLÉPÉSES MÉRFÖLDKŐ RENDSZER BANNER -->
+          <div class="level-active-banner" id="level-active-banner" style="margin-top:0.85rem;">
+            <div class="level-big-badge">
+              <span class="l-num" id="active-level-num">1</span>
+              <span class="l-text">SZINT</span>
+            </div>
+            <div class="level-active-info">
+              <h3 id="active-level-title">1. Szint: 500 méter Napi Cél</h3>
+              <p id="active-level-desc">
+                Ha eléred az 500 métert, a következő szint automatikusan feloldódik: <strong style="color:var(--accent-gold);" id="active-level-next-hint">2. Szint (1000 lépés)</strong>!
+              </p>
+              <div class="level-progress-track">
+                <div class="level-progress-fill" id="active-level-progress-fill" style="width: 0%;"></div>
+              </div>
+              <div style="font-size:0.8rem; font-weight:800; color:#fff; margin-top:0.35rem; display:flex; justify-content:space-between; flex-wrap:wrap; gap:0.25rem;">
+                <span id="active-level-progress-text">Jelenlegi állás: 0 m / 500 m (0%)</span>
+                <span id="active-level-status-pill" style="color:var(--text-muted);">🎯 Kezdésre vár</span>
+              </div>
+            </div>
+            <button type="button" class="btn-subtle" id="btn-trigger-level-editor" style="white-space:nowrap;">
+              <span>⚙️</span> <span>Szerkesztés</span>
+            </button>
+          </div>
+
+          <!-- SZINTLÉTRA -->
+          <div class="level-ladder-container" style="margin-top:0.85rem;">
+            <div class="level-ladder-header">
+              <h3><span>🪜</span> Szintlépési Mérföldkő Létra</h3>
+              <span style="font-size:0.85rem; color:var(--text-muted);">Testreszabható rehabilitációs célok</span>
+            </div>
+            <div class="level-ladder-list" id="level-ladder-list"></div>
+          </div>
+
+          <!-- SAJÁT SZINTEK SZERKESZTŐJE -->
+          <div class="custom-levels-editor-box" id="custom-levels-editor-box" style="margin-top:0.85rem;">
+            <h4>
+              <span>🛠️</span> Saját Szintek Testreszabása
+              <button type="button" class="btn-subtle" id="btn-add-new-custom-level"><span>+</span> Új Szint</button>
+            </h4>
+            <div class="level-edit-table" id="level-edit-table"></div>
+            <div style="display:flex; justify-content:flex-end; gap:0.5rem; margin-top:0.5rem; flex-wrap:wrap;">
+              <button type="button" class="btn-subtle" id="btn-reset-levels">Alapértelmezett Szintek</button>
+              <button type="button" class="btn-modal-save" id="btn-save-custom-levels" style="padding:0.6rem 1.25rem; font-size:0.95rem;">
+                <span>💾</span> <span>Szintek Mentése</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- KALÓRIA ÉS ERŐSÖDÉS MUTATÓ -->
+          <div class="progress-compare-grid" style="margin-top:0.85rem;">
+            <div class="compare-card">
+              <div class="compare-title">Elégetett Kalória</div>
+              <div class="compare-val" style="color:#fbbf24;">
+                <span>🔥</span> <span id="fit-calories-val">0 kcal</span>
+              </div>
+              <div class="compare-desc" id="fit-calories-desc">Még nincs rögzített séta a kalóriaszámításhoz</div>
+            </div>
+            <div class="compare-card">
+              <div class="compare-title">Előző Napi Átlaghoz</div>
+              <div class="compare-val">
+                <span>—</span> <span id="fit-daily-change">0.0%</span>
+              </div>
+              <div class="compare-desc" id="fit-daily-desc">Még nincs korábbi séta</div>
+            </div>
+            <div class="compare-card">
+              <div class="compare-title">Heti Változás</div>
+              <div class="compare-val">
+                <span>—</span> <span id="fit-weekly-change">0.0%</span>
+              </div>
+              <div class="compare-desc" id="fit-weekly-desc">Még nincs heti átlag</div>
+            </div>
+          </div>
+
+          <!-- ERŐSÖDÉS ÁTLAGA -->
+          <div class="strength-calculation-banner" style="margin-top:0.85rem;">
+            <div class="strength-gauge-circle">
+              <span class="s-pct" id="strength-pct-val">0.0%</span>
+              <span class="s-label">Erősödés</span>
+            </div>
+            <div class="strength-info-content">
+              <h3 style="margin:0 0 0.35rem 0; font-size:1.05rem;"><span>💪</span> Erősödés Átlaga a Járássebességből</h3>
+              <p style="margin:0; font-size:0.82rem; line-height:1.4; color:var(--text-muted);">
+                A sclerosis multiplex rehabilitációjában az 1 perces pihenők közötti szakaszsebesség és a járásritmus stabilitása az izomerő és az egyensúly közvetlen mutatója.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. ADATOK KEZELÉSE (IMPORT & EXPORT) -->
+        <div style="margin-top:1.5rem; border-top:1px solid rgba(255,255,255,0.1); padding-top:1.25rem;">
+          <h2 class="settings-section-title">
+            <span>💾</span> Adatkezelés: Import & Export
+          </h2>
+          <div class="io-actions-grid" style="margin-top:0.85rem;">
+            
+            <div class="io-card">
+              <h3><span>📄</span> TXT Napló Export</h3>
+              <p>Minden mentett séta és útpont letöltése standard szöveges formátumban (csampazo_naplo.txt).</p>
+              <button type="button" class="btn-io" id="btn-export-txt">
+                <span>⬇️</span> <span>csampazo_naplo.txt Letöltése</span>
+              </button>
+            </div>
+
+            <div class="io-card">
+              <h3><span>📥</span> Útvonal / GPX / TXT Import</h3>
+              <p>Korábbi mentett csampazo_naplo.txt vagy GPX fájl betöltése és kiértékelése a térképen.</p>
+              <input type="file" id="file-import-txt" accept=".txt,.gpx,.json,.xml" style="display: none;">
+              <button type="button" class="btn-io" id="btn-import-txt-trigger">
+                <span>⬆️</span> <span>Útvonal / GPX Fájl Betöltése</span>
+              </button>
+            </div>
+
+            <div class="io-card">
+              <h3><span>🗺️</span> GPX Export & Fájlkezelés</h3>
+              <p>Minden útvonal és útpont mentése a Download/csampazo mappába nemzetközi GPX formátumban.</p>
+              <button type="button" class="btn-io" id="btn-export-gpx">
+                <span>🌐</span> <span>GPX Mentése (Download/csampazo)</span>
+              </button>
+              <button type="button" class="btn-io" id="btn-open-latest-gpx" style="margin-top:0.6rem; background:rgba(56,189,248,0.18); border:1px solid var(--accent-cyan); color:#38bdf8; font-weight:700;">
+                <span>📂</span> <span>Legutóbbi GPX Megnyitása Külső Alkalmazással</span>
+              </button>
+            </div>
+
+            <div class="io-card">
+              <h3><span>🔄</span> Helyi Szerver Szinkron</h3>
+              <p>Azonnali szinkronizáció a helyi háttérszerverrel (localhost:8085 API).</p>
+              <button type="button" class="btn-io" id="btn-sync-server">
+                <span>⚡</span> <span>Szerver Szinkron Futtatása</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- GOOGLE DRIVE FELHŐ SZINKRONIZÁCIÓ -->
+        <div class="gdrive-section-card" style="margin-top:1.25rem;">
+          <div class="gdrive-header-row">
+            <div class="gdrive-title-wrap">
+              <span class="gdrive-icon">☁️</span>
+              <div>
+                <h3 class="settings-section-title" style="margin:0; font-size:1.1rem;">Google Drive Szinkronizáció (Android ↔ PC)</h3>
+                <span class="gdrive-sub">Nézd meg a számítógépen a telefonon rögzített sétáidat!</span>
+              </div>
+            </div>
+            <div class="gdrive-status-badge disconnected" id="gdrive-status-badge">
+              <span class="gdrive-status-dot"></span>
+              <span id="gdrive-status-text">Nincs csatlakoztatva</span>
+            </div>
+          </div>
+
+          <div class="gdrive-actions-grid" style="margin-top:0.85rem;">
+            <div class="gdrive-box">
+              <div class="gdrive-box-head">
+                <span>🌐</span> <strong>Közvetlen Felhő Csatlakozás (Google Sign-In)</strong>
+              </div>
+              <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.5rem;">
+                <button type="button" class="btn-gdrive-action connect" id="btn-gdrive-login">
+                  <span>☁️</span> <span>Csatlakozás Drive-hoz</span>
+                </button>
+                <button type="button" class="btn-gdrive-action download" id="btn-gdrive-sync-down" disabled>
+                  <span>📥</span> <span>Séták Letöltése</span>
+                </button>
+                <button type="button" class="btn-gdrive-action upload" id="btn-gdrive-sync-up" disabled>
+                  <span>⬆️</span> <span>Mentés Drive-ra</span>
+                </button>
+                <button type="button" class="btn-gdrive-action disconnect" id="btn-gdrive-logout" style="display:none;">
+                  <span>✕</span> <span>Leválasztás</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="gdrive-box">
+              <div class="gdrive-box-head">
+                <span>📁</span> <strong>Számítógépes Mappa (Azonnali Megnyitás)</strong>
+              </div>
+              <input type="file" id="file-import-gdrive-desktop" accept=".txt,.json,.gpx" style="display: none;">
+              <button type="button" class="btn-gdrive-action local-drive" id="btn-trigger-gdrive-local" style="margin-top:0.5rem;">
+                <span>📂</span> <span>Google Drive Mappa Fájl Megnyitása</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- DEMO MÓD KAPCSOLÓ -->
+        <div class="settings-feature-card" style="margin-top:1.25rem; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: var(--radius-md); padding: 1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+            <div style="max-width: 65%;">
+              <h3 style="font-size:1.05rem; font-weight:800; color:#fff; display:flex; align-items:center; gap:0.4rem; margin:0 0 0.25rem 0;">
+                <span>🎮</span> Demo / Minta Mód
+              </h3>
+              <p style="color:var(--text-muted); font-size:0.8rem; margin:0; line-height:1.4;">
+                Minta séták megjelenítése. <strong style="color:var(--accent-mint);">Alapból kikapcsolva.</strong>
+              </p>
+            </div>
+            <div style="display:flex; align-items:center; gap:0.5rem;">
+              <span class="status-badge" id="demo-mode-badge" style="background:rgba(255,255,255,0.1); color:var(--text-muted); font-size:0.75rem;">KIKAPCSOLVA</span>
+              <button type="button" class="btn-demo-toggle" id="btn-toggle-demo-mode" style="padding:0.5rem 1rem; font-weight:800; font-size:0.8rem; border-radius:var(--radius-sm); border:1px solid #38bdf8; background:rgba(56,189,248,0.15); color:#38bdf8; cursor:pointer;">
+                Bekapcsolás
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ADATOK KITAKARÍTÁSA / TÖRLÉSE -->
+        <div class="settings-danger-card" style="margin-top:1rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: var(--radius-md); padding: 1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+            <div style="max-width: 65%;">
+              <h3 style="font-size:1.05rem; font-weight:800; color:#f87171; display:flex; align-items:center; gap:0.4rem; margin:0 0 0.25rem 0;">
+                <span>🧹</span> Összes Adat Kitakarítása
+              </h3>
+              <p style="color:var(--text-muted); font-size:0.8rem; margin:0; line-height:1.4;">
+                Kitörli az összes rögzített sétát és saját útpontot a telefon memóriájából.
+              </p>
+            </div>
+            <div>
+              <button type="button" class="btn-clear-all" id="btn-clear-all-data" style="padding:0.55rem 1rem; font-weight:800; font-size:0.8rem; border-radius:var(--radius-sm); border:1px solid #ef4444; background:rgba(239,68,68,0.2); color:#fca5a5; cursor:pointer;">
+                <span>🗑️</span> <span>Minden Törlése</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rejtett Képernyő-sorrend elem kompatibilitáshoz -->
+        <div id="screen-order-list" style="display:none;"></div>
+
+      </section>
+
+    </main>
+
+    <!-- ==========================================================================
+         FIX ALSÓ MOBIL NAVIGÁCIÓS SÁV (5 OLDAL)
+         1. Felvétel | 2. Útvonalak | 3. Elemzés | 4. Útpontok | 5. Beállítások
+         ========================================================================== -->
+    <nav class="screens-nav-bar" id="screens-nav-bar" aria-label="Képernyők navigációja">
+      <button type="button" class="nav-tab-btn active" data-screen="screen-live" id="nav-btn-screen-live" title="1. Oldal: Csak felvétel, élő térkép csiganyállal">
+        <span class="nav-icon">🚶</span> <span class="nav-text">Felvétel</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-screen="screen-history" id="nav-btn-screen-history" title="2. Oldal: Útvonallista, mentési ablakkal, kiválasztással">
+        <span class="nav-icon">📜</span> <span class="nav-text">Útvonalak</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-screen="screen-summary" id="nav-btn-screen-summary" title="3. Oldal: Kiválasztott útvonal elemzése térképpel">
+        <span class="nav-icon">📊</span> <span class="nav-text">Elemzés</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-screen="screen-waypoints" id="nav-btn-screen-waypoints" title="4. Oldal: Útpontkezelés">
+        <span class="nav-icon">📍</span> <span class="nav-text">Útpontok</span>
+      </button>
+      <button type="button" class="nav-tab-btn" data-screen="screen-settings" id="nav-btn-screen-settings" title="5. Oldal: Beállítások és adatok">
+        <span class="nav-icon">⚙️</span> <span class="nav-text">Beállítások</span>
+      </button>
+    </nav>
+
+  </div>
+
+  <!-- ==========================================================================
+       GYORS PARAMÉTER-MÓDOSÍTÓ MODAL (NAPI CÉL ÉS PIHENŐIDŐ KÖZVETLEN ÁLLÍTÁSA)
+       ========================================================================== -->
+  <div class="modal-backdrop" id="modal-quick-param">
+    <div class="modal-window-card" style="max-width: 480px;">
+      <div class="modal-header-strip">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">⚙️</span>
+          <h2 id="quick-modal-title">Cél és Pihenőidő Módosítása</h2>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-close-quick-param-modal" title="Bezárás">✕</button>
+      </div>
+
+      <form id="form-quick-param" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem;">
+        
+        <div class="form-field-group">
+          <label class="field-label" for="modal-input-goal-val">Napi Cél Értéke</label>
+          <div style="display:flex; gap:0.5rem;">
+            <input type="number" id="modal-input-goal-val" class="text-input-large" min="10" max="10000" step="10" value="500" required>
+            <select id="modal-input-goal-type" class="text-input-large" style="width:140px;">
+              <option value="meters" selected>Méter</option>
+              <option value="steps">Lépés</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-field-group">
+          <label class="field-label" for="modal-input-rest-sec">Pihenőidő Küszöbérték (másodperc)</label>
+          <div style="display:flex; gap:0.5rem; align-items:center;">
+            <input type="number" id="modal-input-rest-sec" class="text-input-large" min="10" max="600" step="5" value="60" required>
+            <span style="font-weight:900; color:#fff; font-size:1.1rem; padding:0 0.5rem;">mp</span>
+          </div>
+          <small style="color:var(--text-muted); font-size:0.8rem;">Ennél hosszabb ideig tartó megállás számít 1 hivatalos SM pihenőnek.</small>
+        </div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-modal-cancel" id="btn-cancel-quick-param">Mégse</button>
+          <button type="submit" class="btn-modal-save">
+            <span>💾</span> <span>Alkalmazás</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       ÚTPONT RÖGZÍTŐ ABLAK (MODAL)
+       ========================================================================== -->
+  <div class="modal-backdrop" id="modal-waypoint">
+    <div class="modal-window-card">
+      <div class="modal-header-strip">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">📍</span>
+          <h2>Útpont Felvétele</h2>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-close-waypoint-modal" title="Bezárás">✕</button>
+      </div>
+
+      <form id="form-waypoint" class="waypoint-modal-form" action="javascript:void(0);" onsubmit="return false;">
+        
+        <div class="form-field-group">
+          <label class="field-label" for="input-wp-name">Útpont elnevezése</label>
+          <input type="text" id="input-wp-name" class="text-input-large" placeholder="pl. Pad a rózsakertnél, Ivókút, Lépcsőmentes bejárat..." required autocomplete="off">
+        </div>
+
+        <!-- IKONKÉSZLET VÁLASZTÓ -->
+        <div class="form-field-group">
+          <label class="field-label">Útpont Ikonja (Válassz a készletből)</label>
+          <div class="wp-icon-palette-grid" id="wp-icon-palette">
+            <button type="button" class="wp-icon-btn active" data-icon="📍" title="Általános útpont">📍</button>
+            <button type="button" class="wp-icon-btn" data-icon="🪑" title="Pad / Pihenőpad">🪑</button>
+            <button type="button" class="wp-icon-btn" data-icon="💧" title="Ivókút">💧</button>
+            <button type="button" class="wp-icon-btn" data-icon="♿" title="Akadálymentes rámpa / lift">♿</button>
+            <button type="button" class="wp-icon-btn" data-icon="🌳" title="Árnyékos fa / Liget">🌳</button>
+            <button type="button" class="wp-icon-btn" data-icon="🌸" title="Rózsakert / Virágos park">🌸</button>
+            <button type="button" class="wp-icon-btn" data-icon="☕" title="Kávézó / Büfé / Pihenő">☕</button>
+            <button type="button" class="wp-icon-btn" data-icon="🚻" title="Mosdó / WC">🚻</button>
+            <button type="button" class="wp-icon-btn" data-icon="⚠️" title="Akadály / Lépcső / Veszély">⚠️</button>
+            <button type="button" class="wp-icon-btn" data-icon="🏥" title="Elsősegély / Orvosi pont">🏥</button>
+            <button type="button" class="wp-icon-btn" data-icon="📸" title="Kilátás / Fotópont">📸</button>
+            <button type="button" class="wp-icon-btn" data-icon="🛒" title="Bolt / Gyógyszertár">🛒</button>
+          </div>
+          <input type="hidden" id="input-wp-selected-icon" value="📍">
+        </div>
+
+        <div class="form-field-group">
+          <label class="field-label">Címkék kiválasztása vagy hozzáadása</label>
+          <div class="tag-cloud-wrapper" id="tag-cloud-container">
+            <button type="button" class="chip-btn chip-add-tag" id="btn-add-custom-tag" title="Új címke hozzáadása a felhőbe">
+              <span>+</span> <span>Új címke</span>
+            </button>
+            <button type="button" class="chip-btn selected" data-tag="Pad">🪑 Pad</button>
+            <button type="button" class="chip-btn" data-tag="Árnyék">🌳 Árnyék</button>
+            <button type="button" class="chip-btn" data-tag="Akadálymentes">♿ Akadálymentes</button>
+            <button type="button" class="chip-btn" data-tag="Ivókút">💧 Ivókút</button>
+            <button type="button" class="chip-btn" data-tag="Akadály">⚠️ Akadály</button>
+            <button type="button" class="chip-btn" data-tag="Mosdó">🚻 Mosdó</button>
+            <button type="button" class="chip-btn" data-tag="Rózsakert">🌸 Rózsakert</button>
+            <button type="button" class="chip-btn" data-tag="Pihenőhely">☕ Pihenőhely</button>
+          </div>
+          
+          <div class="new-tag-input-box" id="new-tag-input-box" style="display: none;">
+            <input type="text" id="input-new-tag-text" class="text-input-tag" placeholder="Írd be az új címke nevét...">
+            <button type="button" class="btn-subtle-ok" id="btn-confirm-new-tag">Hozzáad</button>
+            <button type="button" class="btn-subtle-cancel" id="btn-cancel-new-tag">Mégse</button>
+          </div>
+        </div>
+
+        <div class="geo-location-box">
+          <div class="geo-row">
+            <span class="geo-label">Koordináta:</span>
+            <strong class="geo-val" id="wp-display-coords">GPS pozíció lekérése...</strong>
+          </div>
+          <div class="geo-row">
+            <span class="geo-label">Cím:</span>
+            <span class="geo-address" id="wp-display-address">Aktuális pozíció meghatározása...</span>
+          </div>
+          <div class="geo-row">
+            <span class="geo-label">Pontosság:</span>
+            <span class="geo-accuracy-highlight" id="wp-display-accuracy">(pontosság: mérés folyamatban)</span>
+          </div>
+        </div>
+
+        <button type="button" class="btn-refine-large" id="btn-refine-gps">
+          <span class="refine-icon">🎯</span>
+          <span class="refine-text">Pontosítás</span>
+          <span class="refine-sub">(GPS jel többpontos átlagolása)</span>
+        </button>
+        <div class="refine-status-msg" id="refine-status-msg" style="display: none;"></div>
+
+        <div class="modal-actions-row">
+          <button type="button" class="btn-modal-cancel" id="btn-cancel-waypoint">Mégse</button>
+          <button type="submit" class="btn-modal-save" id="btn-save-waypoint">
+            <span>💾</span> <span>Útpont Mentése</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       HASZNÁLATI UTASÍTÁS ABLAK (MODAL) - Bal felső (?) hosszan nyomására
+       ========================================================================== -->
+  <div class="modal-backdrop" id="modal-user-guide">
+    <div class="modal-window-card" style="max-width: 680px; max-height: 88vh; display: flex; flex-direction: column;">
+      <div class="modal-header-strip">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">📖</span>
+          <h2>Csámpázó Használati Útmutató</h2>
+        </div>
+        <button type="button" class="btn-close-modal" id="btn-close-user-guide" title="Bezárás">✕</button>
+      </div>
+
+      <div class="user-guide-scroll-content" style="padding: 1.25rem 1.4rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; line-height: 1.55; color: var(--text-main);">
+        
+        <div class="guide-card-item">
+          <h3 style="color: var(--accent-mint); font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+            <span>🚶</span> 1. Séta Vezérlése (3 Főgomb)
+          </h3>
+          <ul style="padding-left: 1.25rem; font-size: 0.9rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 0.35rem;">
+            <li><strong>▶ Kezdés:</strong> Elindítja a másodpercenkénti mérést, a GPS követést és a lépésszámlálást. <em>Képernyőzár alatt a zsebben is folyamatosan mér!</em></li>
+            <li><strong>⏸ Pause:</strong> Ideiglenesen szünetelteti a sétát. A képernyő sárgán villog. A Kezdés vagy Pause gombbal bármikor folytatható.</li>
+            <li><strong>⏹ Vége:</strong> Befejezi a sétát, leállítja a szenzorokat és automatikusan menti az adatokat a készülék <code>Download/csampazo</code> mappájába GPX és CSV formátumban.</li>
+          </ul>
+        </div>
+
+        <div class="guide-card-item">
+          <h3 style="color: var(--accent-gold); font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+            <span>🦯</span> 2. Bot Használat Jelölése
+          </h3>
+          <p style="font-size: 0.9rem; color: #cbd5e1; margin: 0;">
+            A <strong>„Bot”</strong> gombbal séta közben bármikor jelezheted, hogy bottal vagy bot nélkül haladsz. A statisztikákban külön láthatóvá válik a mért lépéshossz stabilitása és a megtett táv mindkét állapotban.
+          </p>
+        </div>
+
+        <div class="guide-card-item">
+          <h3 style="color: var(--accent-cyan); font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+            <span>📍</span> 3. Útpontok és Padok Rögzítése
+          </h3>
+          <p style="font-size: 0.9rem; color: #cbd5e1; margin: 0;">
+            Séta közben az <strong>„Útpont rögzítése”</strong> gombbal elmentheted az utadba eső pihenőpadokat (🪑), ivókutakat (💧), akadálymentes helyeket (♿) vagy árnyékos pihenőket. A pontok a térképen ikonnal jelennek meg és megmaradnak a jövőbeli sétáidhoz is.
+          </p>
+        </div>
+
+        <div class="guide-card-item">
+          <h3 style="color: #fbbf24; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+            <span>🪑</span> 4. SM Pihenő Küszöb (60 másodperces szabály)
+          </h3>
+          <p style="font-size: 0.9rem; color: #cbd5e1; margin: 0;">
+            A sclerosis multiplex rehabilitációjában a rövid pillanatnyi megállás nem számít hivatalos pihenőnek. A rendszer csak a beállított küszöböt (alapértelmezett: <strong>60 mp</strong>) meghaladó állást vagy ülést jegyzi fel külön SM pihenőként.
+          </p>
+        </div>
+
+        <div class="guide-card-item">
+          <h3 style="color: #38bdf8; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+            <span>💡</span> 5. Lebegő Gyorsgombok a sarkokban
+          </h3>
+          <ul style="padding-left: 1.25rem; font-size: 0.9rem; color: #cbd5e1; display: flex; flex-direction: column; gap: 0.35rem;">
+            <li><strong>❓ Bal felső sarok (hosszan nyomva):</strong> Ennek a használati útmutatónak a megnyitása.</li>
+            <li><strong>💡 Jobb felső sarok (hosszan nyomva):</strong> A telefon hátoldali vaku lámpájának bekapcsolása.</li>
+            <li><strong>💡 Jobb felső sarok (ismételt megnyomás):</strong> A vaku lámpa azonnali lekapcsolása. Mérés közben is zavartalanul működik!</li>
+          </ul>
+        </div>
+
+        <div class="guide-card-item">
+          <h3 style="color: #a78bfa; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+            <span>📊</span> 6. Elemzés & Google Drive Felhő
+          </h3>
+          <p style="font-size: 0.9rem; color: #cbd5e1; margin: 0;">
+            Az <em>Útvonalak</em> és <em>Elemzés</em> menüpontokban visszanézheted a sebességgörbédet, a szintkülönbséget és a fáradási dinamikát. A Beállítások menüben közvetlenül összekötheted a Google Drive-oddal is a szinkronizáláshoz.
+          </p>
+        </div>
+
+      </div>
+
+      <div class="modal-actions-row" style="padding: 1rem 1.4rem; border-top: 1px solid var(--border-subtle); justify-content: flex-end;">
+        <button type="button" class="btn-modal-save" id="btn-ack-user-guide" style="padding: 0.6rem 1.5rem;">
+          <span>✓</span> <span>Értem, bezárás</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast értesítések -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Leaflet, Google Identity & Google Drive Szinkronizációs Szkriptek -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="js/gdrive.js"></script>
+  <script src="js/leaflet.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

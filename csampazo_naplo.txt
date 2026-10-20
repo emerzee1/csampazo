@@ -1,0 +1,5 @@
+# ========================================================
+# CSÁMPÁZÓ - SM SÉTA- ÉS LÉPÉSNAPLÓ (csampazo_naplo.txt)
+# Sclerosis Multiplex rehabilitációs és séta követő napló
+# Formátum: DÁTUM [SZÓKÖZ] IDŐ | LÉPÉSSZÁM | TÁV (m) | IDŐ (perc:mp) | TÍPUS | PIHENŐK | CÍMKÉK | JEGYZET
+# ========================================================

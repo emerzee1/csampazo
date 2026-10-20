@@ -1,0 +1,5061 @@
+/* ==========================================================================
+   CSÁMPÁZÓ - SM SÉTAKÖVETŐ & REHABILITÁCIÓS RENDSZER
+   Ergonómikus, letisztult, akadálymentes stíluslap
+   ========================================================================== */
+
+:root {
+  /* Színpaletta */
+  --bg-deep: #070c16;
+  --bg-surface: #0f172a;
+  --bg-card: #141e33;
+  --bg-card-alt: #18233c;
+  --bg-hover: #1e2c4a;
+  
+  --border-subtle: rgba(255, 255, 255, 0.12);
+  --border-active: rgba(255, 255, 255, 0.28);
+  
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+
+  /* Funkciógombok színei */
+  --color-start: #10b981;       /* Zöld: Kezdés */
+  --color-start-hover: #059669;
+  --color-pause: #f59e0b;       /* Borostyánsárga: Pause */
+  --color-pause-hover: #d97706;
+  --color-stop: #ef4444;        /* Piros: Vége */
+  --color-stop-hover: #dc2626;
+  --color-waypoint: #0284c7;    /* Kék: Útpont */
+  --color-waypoint-hover: #0369a1;
+
+  --accent-cyan: #06b6d4;
+  --accent-mint: #34d399;
+  --accent-purple: #a855f7;
+  --accent-gold: #fbbf24;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-full: 9999px;
+
+  --font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-deep);
+  color: var(--text-main);
+  min-height: 100vh;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ==========================================================================
+   PAUSE VILLOGÁS (Amikor Pause aktív, az egész képernyő pulzálva villog)
+   ========================================================================== */
+body.state-paused {
+  animation: pauseScreenBlink 1.4s ease-in-out infinite;
+}
+
+@keyframes pauseScreenBlink {
+  0% {
+    box-shadow: inset 0 0 0 0 rgba(245, 158, 11, 0);
+    background-color: var(--bg-deep);
+  }
+  50% {
+    box-shadow: inset 0 0 90px 20px rgba(245, 158, 11, 0.45);
+    background-color: #191206;
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(245, 158, 11, 0);
+    background-color: var(--bg-deep);
+  }
+}
+
+/* ==========================================================================
+   KEZDÉS (Amikor Séta aktív, az egész képernyő simán, folyamatosan zöld, nem pulzál)
+   ========================================================================== */
+body.state-running {
+  background-color: #064e3b;
+  box-shadow: inset 0 0 100px 30px rgba(16, 185, 129, 0.55);
+}
+
+/* ==========================================================================
+   GPS JELVÉTELI KERET (PIROS VILLOGÁS AMÍG KERES, ZÖLD HA MEGVAN A FIX)
+   ========================================================================== */
+.gps-edge-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none !important;
+  z-index: 99999;
+  transition: box-shadow 0.45s ease-in-out;
+  display: none;
+}
+
+/* Amíg a GPS nem fogott jelet: a képernyő széle villog / pulzál pirosan */
+.gps-edge-indicator.gps-searching {
+  display: block !important;
+  pointer-events: none !important;
+  box-shadow: inset 0 0 28px 10px rgba(239, 68, 68, 0.95), inset 0 0 75px 22px rgba(220, 38, 38, 0.65) !important;
+  animation: gpsRedEdgePulse 1.1s infinite ease-in-out !important;
+}
+
+@keyframes gpsRedEdgePulse {
+  0%, 100% {
+    box-shadow: inset 0 0 16px 5px rgba(239, 68, 68, 0.35), inset 0 0 35px 10px rgba(220, 38, 38, 0.2);
+  }
+  50% {
+    box-shadow: inset 0 0 45px 16px rgba(239, 68, 68, 1), inset 0 0 100px 38px rgba(220, 38, 38, 0.85);
+  }
+}
+
+/* Ha a GPS jelet fogott: átvált határozott zöldre */
+.gps-edge-indicator.gps-fixed {
+  display: block !important;
+  pointer-events: none !important;
+  box-shadow: inset 0 0 26px 8px rgba(16, 185, 129, 0.95), inset 0 0 60px 18px rgba(16, 185, 129, 0.45) !important;
+  animation: none !important;
+}
+
+.gps-edge-indicator.gps-idle {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+.pause-alert-banner {
+  display: none;
+  background: linear-gradient(90deg, #d97706, #f59e0b, #d97706);
+  color: #070c16;
+  padding: 0.85rem 1rem;
+  text-align: center;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #fff;
+  z-index: 1000;
+  position: sticky;
+  top: 0;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.4);
+  animation: bannerPulse 1.4s infinite;
+}
+
+body.state-paused .pause-alert-banner {
+  display: block;
+}
+
+@keyframes bannerPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(0.995); }
+}
+
+.pause-alert-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.pause-hint {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e1b12;
+}
+
+/* ==========================================================================
+   FŐ KONTÉNER & KÉPERNYŐ NAVIGÁCIÓ
+   ========================================================================== */
+.main-screen-container {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0.75rem 0.85rem calc(4.8rem + env(safe-area-inset-bottom, 0px)) 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* KÉPERNYŐ VÁLTÓ MENÜSÁV (FIX ALSÓ NAVIGÁCIÓ MINDEN MOBIL ÉS ASZTALI KÉPERNYŐRE) */
+.screens-nav-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: none;
+  border-left: none;
+  border-right: none;
+  border-radius: 0;
+  padding: 0.35rem 0.35rem calc(0.35rem + env(safe-area-inset-bottom, 0px)) 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 0.2rem;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.screens-nav-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-tab-btn {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.4rem 0.15rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  transition: all 0.15s ease;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.nav-tab-btn .nav-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.nav-tab-btn .nav-text {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.nav-tab-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-tab-btn.active {
+  background: rgba(2, 132, 199, 0.25);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+}
+
+/* KÉPERNYŐ NÉZETEK (TABS) */
+.view-screen {
+  display: none;
+  flex-direction: column;
+  gap: 1.25rem;
+  animation: fadeInView 0.15s ease-out;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.view-screen.active {
+  display: flex;
+}
+
+@keyframes fadeInView {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   1. KÉPERNYŐ: FELSŐ SÁV (LOGÓ, IDŐ, DÁTUM, GPS)
+   ========================================================================== */
+.top-status-bar {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.5rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.app-brand-box {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.app-logo-img {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.brand-text-wrap .app-title {
+  font-size: 1.45rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: #fff;
+  line-height: 1.1;
+}
+
+.brand-text-wrap .app-sub {
+  font-size: 0.8rem;
+  color: var(--accent-mint);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.time-date-panel {
+  text-align: center;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.6rem 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.live-clock {
+  font-size: 2.1rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.live-date {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 0.2rem;
+}
+
+.gps-status-panel {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.gps-indicator-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.gps-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: var(--color-start);
+  box-shadow: 0 0 10px var(--color-start);
+  animation: pulseDot 1.8s infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.gps-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.gps-acc-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.15);
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.gps-details-row {
+  font-size: 0.8rem;
+  font-family: monospace;
+  color: var(--text-muted);
+}
+
+/* ÁLLAPOTSÁV */
+.status-telemetry-bar {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.telemetry-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.t-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+.t-val {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.t-distance {
+  color: var(--accent-mint);
+  font-size: 1.7rem;
+}
+
+.status-badge {
+  font-size: 0.95rem !important;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.1);
+  font-weight: 800;
+}
+
+.status-badge.running {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-mint);
+  border: 1px solid var(--accent-mint);
+}
+
+.status-badge.paused {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+  border: 1px solid #fbbf24;
+}
+
+/* EGYMÁS ALATT A NAGY GOMBOK */
+.large-buttons-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+}
+
+.action-btn-stacked {
+  appearance: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  min-height: 74px;
+  padding: 1.1rem 1.6rem;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1.25rem;
+  color: #fff;
+  font-weight: 900;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  user-select: none;
+}
+
+.action-btn-stacked:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+.action-btn-stacked:active {
+  transform: translateY(2px);
+  filter: brightness(0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.action-btn-stacked .btn-icon {
+  font-size: 2.1rem;
+  line-height: 1;
+  width: 44px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.action-btn-stacked .btn-label {
+  font-size: 1.4rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.action-btn-stacked .btn-hint {
+  margin-left: auto;
+  font-size: 0.88rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.btn-start {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border: 2px solid #34d399;
+}
+
+body.state-running .btn-start {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  border-color: #fff;
+  box-shadow: 0 0 24px #10b981;
+}
+
+.btn-pause {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 2px solid #fbbf24;
+}
+
+body.state-paused .btn-pause {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border-color: #fff;
+  box-shadow: 0 0 24px #f59e0b;
+}
+
+.btn-stop {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: 2px solid #f87171;
+}
+
+.btn-waypoint {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border: 2px solid #38bdf8;
+}
+
+/* ==========================================================================
+   1. KÉPERNYŐ: ÉLŐ VEZÉRLŐ GOMBOK (3+2 ERGONÓMIKUS RÁCS ELRENDEZÉS)
+   ========================================================================== */
+.live-controls-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.35rem;
+  box-sizing: border-box;
+}
+
+.live-controls-row-top {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.live-controls-row-bottom {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.live-controls-row-top .action-btn-stacked {
+  min-height: 58px;
+  padding: 0.55rem 0.25rem;
+  border-radius: var(--radius-md);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.live-controls-row-top .action-btn-stacked .btn-icon {
+  font-size: 1.45rem;
+  width: auto;
+  line-height: 1;
+}
+
+.live-controls-row-top .action-btn-stacked .btn-label {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.action-btn-wide {
+  appearance: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  width: 100%;
+  min-height: 52px;
+  padding: 0.65rem 0.75rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 800;
+  font-size: 0.92rem;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+  user-select: none;
+  color: #fff;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.action-btn-wide:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.action-btn-wide:active {
+  transform: translateY(2px);
+}
+
+.action-btn-wide .btn-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.action-btn-wide .btn-label {
+  font-size: 0.88rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.btn-stick {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid #f59e0b;
+  color: #f8fafc;
+}
+
+.btn-stick:hover {
+  border-color: #fbbf24;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
+}
+
+.btn-stick.active {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 2px solid #fde047;
+  color: #0b0f19;
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.65);
+}
+
+/* BOT BE/KI GOMB STÍLUS */
+.btn-stick-toggle {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 2px solid #f59e0b;
+  color: #f8fafc;
+}
+
+.btn-stick-toggle:hover {
+  border-color: #fbbf24;
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.35);
+}
+
+.btn-stick-toggle.active {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: 2px solid #fde047;
+  color: #0b0f19;
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.65);
+}
+
+.btn-stick-toggle.active .btn-hint {
+  color: #0b0f19;
+  font-weight: 800;
+}
+
+.stick-live-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 1rem;
+  margin-top: 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.stick-strip-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stick-strip-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* TÉRKÉP KÁRTYA */
+.map-section-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.map-header-bar {
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.map-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.map-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.btn-subtle {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.btn-subtle:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #fff;
+}
+
+/* 2-Rétegű Kapcsoló: Utcanézet és Műholdkép */
+.map-layer-switch-box {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.layer-pill-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 0.32rem 0.6rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.layer-pill-btn:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.layer-pill-btn.active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border: 1px solid #38bdf8;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.4);
+}
+
+.map-canvas-wrap {
+  width: 100%;
+  height: clamp(260px, 44vh, 440px);
+  position: relative;
+  background-color: #0d1527;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.08) 0%, transparent 70%),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 100% 100%, 30px 30px, 30px 30px;
+}
+
+#main-track-map,
+#history-track-map {
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+}
+
+/* LEAFLET NAGYÍTÓ VEZÉRLŐK (+ / - GOMBOK) KÉNYELMES MOBIL ÉRINTÉSRE */
+.leaflet-control-zoom {
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: var(--radius-md) !important;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5) !important;
+  margin: 12px !important;
+}
+
+.leaflet-control-zoom a {
+  background-color: rgba(15, 23, 42, 0.9) !important;
+  color: #38bdf8 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  width: 42px !important;
+  height: 42px !important;
+  line-height: 42px !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  backdrop-filter: blur(8px);
+  transition: all 0.15s ease;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.leaflet-control-zoom a:hover,
+.leaflet-control-zoom a:active {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
+}
+
+/* 5 KM-EN BELÜLI ÚTPONTOK */
+.waypoints-5km-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.waypoints-header-bar {
+  padding: 1rem 1.25rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.waypoints-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.waypoints-header-title h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.wp-radius-badge {
+  background: rgba(2, 132, 199, 0.2);
+  border: 1px solid var(--color-waypoint);
+  color: #7dd3fc;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+#history-routes-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.btn-add-wp-trigger {
+  background: var(--color-waypoint);
+  color: #fff;
+  border: none;
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: background 0.15s ease;
+}
+
+.btn-add-wp-trigger:hover {
+  background: #0369a1;
+}
+
+.wp-filter-chips-bar {
+  padding: 0.75rem 1.25rem;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filter-chip-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.filter-chip-btn:hover {
+  color: #fff;
+  border-color: var(--border-active);
+}
+
+.filter-chip-btn.active {
+  background: var(--color-waypoint);
+  color: #fff;
+  border-color: #38bdf8;
+}
+
+.waypoints-grid-container {
+  padding: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.wp-empty-notice {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-dim);
+}
+
+.wp-item-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.wp-item-card:hover {
+  border-color: var(--border-active);
+  transform: translateY(-2px);
+}
+
+.wp-card-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.wp-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.wp-card-symbol {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.wp-card-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.wp-distance-badge {
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid var(--color-start);
+  color: var(--accent-mint);
+  font-size: 0.85rem;
+  font-weight: 900;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.wp-card-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.wp-badge-tag {
+  background: rgba(2, 132, 199, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #7dd3fc;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+}
+
+.wp-card-geo-info {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-top: 0.2rem;
+}
+
+.wp-card-acc {
+  color: var(--accent-cyan);
+  font-weight: 700;
+}
+
+.wp-card-action-bar {
+  margin-top: 0.35rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.btn-show-on-map {
+  background: transparent;
+  border: none;
+  color: var(--accent-mint);
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-show-on-map:hover {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   2. KÉPERNYŐ: TÉRKÉP, HETI NAPTÁR, ELŐZŐ UTAK
+   ========================================================================== */
+/* Heti Naptár Sáv */
+.weekly-calendar-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.calendar-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calendar-header-row h3 {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.calendar-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.6rem;
+}
+
+.day-pill-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  padding: 0.85rem 0.5rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.day-pill-btn:hover {
+  border-color: var(--border-active);
+  background: var(--bg-hover);
+}
+
+.day-pill-btn.active {
+  background: var(--color-waypoint);
+  border-color: #38bdf8;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+}
+
+.day-pill-btn .d-name {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.day-pill-btn.active .d-name {
+  color: #fff;
+}
+
+.day-pill-btn .d-num {
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.day-pill-btn .d-indicator {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--accent-mint);
+  min-height: 16px;
+}
+
+/* Előző útvonalak lista */
+.history-walks-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.history-walks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.history-walks-header h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.walks-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.walk-timeline-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1.25rem;
+  transition: all 0.15s ease;
+}
+
+.walk-timeline-item:hover {
+  border-color: var(--border-active);
+  background: var(--bg-hover);
+}
+
+.walk-timeline-item.selected {
+  border-color: var(--accent-mint);
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: inset 4px 0 0 var(--accent-mint);
+}
+
+.w-item-date-badge {
+  text-align: center;
+  min-width: 65px;
+}
+
+.w-item-date-badge .d-main {
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.w-item-date-badge .d-sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.w-item-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.w-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.w-item-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.w-item-metrics-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.w-item-metrics-strip strong {
+  color: #fff;
+}
+
+.w-item-notes {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.w-item-actions-col {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.w-item-select-btn {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: var(--accent-mint);
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  pointer-events: auto;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+}
+
+.w-item-select-btn:hover {
+  background: rgba(16, 185, 129, 0.3);
+  border-color: #34d399;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.w-item-select-btn.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  border-color: #fff;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.w-item-delete-btn {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.w-item-delete-btn:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.w-item-save-btn {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.w-item-save-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 680px) {
+  .walk-timeline-item {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "date info"
+      "actions actions";
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .w-item-date-badge {
+    grid-area: date;
+    align-self: start;
+    min-width: 55px;
+  }
+
+  .w-item-info-col {
+    grid-area: info;
+    min-width: 0;
+  }
+
+  .w-item-actions-col {
+    grid-area: actions;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr auto !important;
+    align-items: center;
+    gap: 0.4rem;
+    width: 100%;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    box-sizing: border-box;
+  }
+
+  .w-item-select-btn {
+    text-align: center;
+    padding: 0.45rem 0.4rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-sizing: border-box;
+  }
+
+  .w-item-save-btn {
+    text-align: center;
+    justify-content: center;
+    padding: 0.45rem 0.5rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    box-sizing: border-box;
+  }
+
+  .w-item-delete-btn {
+    padding: 0.45rem 0.55rem;
+    font-size: 0.78rem;
+    justify-content: center;
+    white-space: nowrap;
+    box-sizing: border-box;
+  }
+}
+
+/* ==========================================================================
+   3. KÉPERNYŐ: ÚTVONAL ÖSSZESÍTÉS (RÉSZLETES METRIKÁK)
+   Hossz, lépésszám, sebesség, pihenők száma (1 perces szabály), emelkedés
+   ========================================================================== */
+.summary-overview-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.summary-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 1rem;
+}
+
+.summary-title-wrap h2 {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.summary-title-wrap p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+/* 6-OS ÖSSZESÍTŐ METRIKA RÁCS */
+.summary-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.sum-metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.sum-metric-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sum-metric-val {
+  font-size: 1.9rem;
+  font-weight: 900;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.sum-metric-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Pihenő kártya kiemelt magyarázattal */
+.card-highlight-rest {
+  border-color: rgba(245, 158, 11, 0.4);
+  background: linear-gradient(145deg, var(--bg-card), rgba(245, 158, 11, 0.08));
+}
+
+.card-highlight-rest .sum-metric-val {
+  color: #fbbf24;
+}
+
+.rest-rule-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-top: 0.3rem;
+  line-height: 1.3;
+}
+
+/* További kimutatások doboz */
+.summary-extra-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.summary-extra-box h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.extra-metrics-strip {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
+  text-align: center;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 860px) {
+  .extra-metrics-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 580px) {
+  .extra-metrics-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.extra-item {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.extra-item .e-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.extra-item .e-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fff;
+  margin-top: 0.2rem;
+}
+
+/* ==========================================================================
+   SEBESSÉG SZÍNVONAL ÉS SZÍNEK SEBESSÉGE (SCREEN 3)
+   ========================================================================== */
+.summary-speed-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.summary-speed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.summary-speed-header h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.speed-avg-badge {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid var(--color-start);
+  color: #34d399;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+}
+
+.speed-line-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.speed-line-bar {
+  width: 100%;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.speed-seg {
+  height: 100%;
+  transition: opacity 0.15s ease, filter 0.15s ease;
+  cursor: pointer;
+}
+
+.speed-seg:hover {
+  opacity: 0.85;
+  filter: brightness(1.25);
+}
+
+.speed-line-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.speed-legend-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+  .speed-legend-container {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.speed-legend-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.75rem;
+}
+
+.speed-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.speed-color-dot.dot-rest {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
+.speed-color-dot.dot-slow {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+
+.speed-color-dot.dot-normal {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.speed-color-dot.dot-fast {
+  background: #06b6d4;
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+}
+
+.speed-legend-pill .speed-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.speed-legend-pill .speed-label strong {
+  color: #fff;
+  display: block;
+  font-size: 0.85rem;
+}
+
+/* ==========================================================================
+   4. KÉPERNYŐ: TELJESÍTMÉNY, FITNESS & MÉRFÖLDKÖVEK
+   Kalória, napi/heti/havi változás, erősödés átlaga sebességből
+   ========================================================================== */
+.fitness-trends-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.fitness-trends-header h2 {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.fitness-trends-header p {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+/* Változási mutatók kártyái */
+.progress-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.compare-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.compare-title {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.compare-val {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--accent-mint);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.compare-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* ERŐSÖDÉS ÁTLAGA (SEBESSÉGBŐL SZÁMOLVA) */
+.strength-calculation-banner {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.15) 0%, rgba(16, 185, 129, 0.12) 100%);
+  border: 2px solid rgba(6, 182, 212, 0.4);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+}
+
+.strength-gauge-circle {
+  width: 102px;
+  height: 102px;
+  min-width: 102px;
+  min-height: 102px;
+  border-radius: 50%;
+  background: rgba(6, 182, 212, 0.2);
+  border: 3px solid var(--accent-cyan);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.35);
+  padding: 6px;
+  box-sizing: border-box;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.strength-gauge-circle .s-pct {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--accent-cyan);
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  text-align: center;
+  max-width: 90px;
+}
+
+.strength-gauge-circle .s-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-top: 3px;
+  text-align: center;
+  color: #cbd5e1;
+  letter-spacing: 0.5px;
+}
+
+.strength-info-content h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.strength-info-content p {
+  font-size: 0.88rem;
+  color: #cbd5e1;
+  margin-top: 0.25rem;
+}
+
+/* Mérföldkövek Rács */
+.milestones-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.milestone-badge-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.45rem;
+}
+
+.milestone-badge-card.unlocked {
+  border-color: var(--accent-gold);
+  background: linear-gradient(145deg, var(--bg-card), rgba(251, 191, 36, 0.08));
+}
+
+.m-icon {
+  font-size: 2.2rem;
+}
+
+.m-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.m-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.m-status {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+  margin-top: 0.3rem;
+}
+
+.m-status.done {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-mint);
+}
+
+.m-status.progress {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+/* ==========================================================================
+   5. KÉPERNYŐ: ÚTPONT KEZELÉS (TÖRLÉS, ÁTNEVEZÉS, CSOPORTOK, KEDVENCEK)
+   ========================================================================== */
+.waypoint-management-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.wp-mgmt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 1rem;
+}
+
+.wp-mgmt-header h2 {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.wp-mgmt-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* Csoportosító fülek */
+.wp-groups-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.group-tab-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.group-tab-btn.active {
+  background: var(--color-waypoint);
+  color: #fff;
+  border-color: #38bdf8;
+}
+
+/* Útpont kezelő lista */
+.wp-manage-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.wp-manage-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.wp-row-main-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.wp-manage-row:hover {
+  border-color: var(--border-active);
+}
+
+.btn-star-fav {
+  background: transparent;
+  border: none;
+  font-size: 1.6rem;
+  cursor: pointer;
+  color: var(--text-dim);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.btn-star-fav.is-fav {
+  color: #fbbf24;
+  filter: drop-shadow(0 0 6px rgba(251, 191, 36, 0.6));
+}
+
+.btn-star-fav:hover {
+  transform: scale(1.15);
+}
+
+.wp-row-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.wp-row-name-input {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #fff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  width: 100%;
+}
+
+.wp-row-name-input:focus {
+  background: var(--bg-deep);
+  border-color: var(--color-waypoint);
+  outline: none;
+}
+
+.wp-row-meta-strip {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.wp-row-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-icon-action {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.btn-icon-action:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.btn-icon-action.delete:hover {
+  background: rgba(239, 68, 68, 0.25);
+  border-color: #ef4444;
+  color: #f87171;
+}
+
+/* ==========================================================================
+   6. KÉPERNYŐ: BEÁLLÍTÁSOK, ADATOK, IMPORT, EXPORT, KÉPERNYŐK SORRENDJE
+   ========================================================================== */
+.settings-main-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.settings-section-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.5rem;
+}
+
+/* KÉPERNYŐK SORRENDJE ÁTRENDEZŐ DOBOZ */
+.screen-order-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.screen-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.screen-order-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.screen-order-item .s-name {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.order-btn-group {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.btn-reorder {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-reorder:hover {
+  background: var(--color-waypoint);
+}
+
+/* IMPORT / EXPORT GOMBOK */
+.io-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.io-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.1rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.io-card h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.io-card p {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.btn-io {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.15s ease;
+  margin-top: auto;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  text-align: center;
+  word-break: break-word;
+}
+
+.btn-io:hover {
+  background: var(--color-waypoint);
+  border-color: #38bdf8;
+}
+
+/* SM ALAPBEÁLLÍTÁSOK FORM */
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.s-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.s-field label {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  word-break: break-word;
+}
+
+.s-field input, .s-field select {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 1rem;
+  font-weight: 600;
+  outline: none;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.s-field select {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.s-field input:focus, .s-field select:focus {
+  border-color: var(--color-waypoint);
+}
+
+/* ==========================================================================
+   ÚTPONT RÖGZÍTŐ MODAL ABLAK (100%-BAN SCROLLOZHATÓ)
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.25rem 1rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-backdrop.active {
+  display: flex;
+}
+
+.modal-window-card {
+  background: var(--bg-surface);
+  border: 2px solid var(--border-active);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 660px;
+  margin: auto;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+  animation: modalPop 0.18s ease-out;
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header-strip {
+  padding: 1.15rem 1.5rem;
+  background: rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.modal-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.modal-title-wrap .modal-icon {
+  font-size: 1.5rem;
+}
+
+.modal-title-wrap h2 {
+  font-size: 1.35rem;
+  font-weight: 900;
+  color: #fff;
+}
+
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  cursor: pointer;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-close-modal:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.waypoint-modal-form {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  overflow-y: auto;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-waypoint) rgba(0, 0, 0, 0.2);
+}
+
+.waypoint-modal-form::-webkit-scrollbar {
+  width: 8px;
+}
+
+.waypoint-modal-form::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.waypoint-modal-form::-webkit-scrollbar-thumb {
+  background: var(--color-waypoint);
+  border-radius: 4px;
+}
+
+.form-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.field-label {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.text-input-large {
+  width: 100%;
+  background: var(--bg-deep);
+  border: 2px solid var(--border-subtle);
+  color: #fff;
+  font-size: 1.15rem;
+  font-weight: 600;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.text-input-large:focus {
+  border-color: var(--color-waypoint);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
+}
+
+.tag-cloud-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip-btn {
+  appearance: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  padding: 0.55rem 0.95rem;
+  border-radius: var(--radius-full);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+}
+
+.chip-btn:hover {
+  border-color: var(--border-active);
+  background: var(--bg-hover);
+}
+
+.chip-btn.selected {
+  background: var(--color-waypoint);
+  color: #fff;
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+}
+
+/* ÚTPONT IKONKÉSZLET VÁLASZTÓ */
+.wp-icon-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.wp-icon-btn {
+  background: var(--bg-card);
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 1.4rem;
+  padding: 0.45rem 0.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.wp-icon-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-waypoint);
+  transform: translateY(-2px);
+}
+
+.wp-icon-btn.active {
+  background: rgba(2, 132, 199, 0.25);
+  border-color: #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+  transform: scale(1.08);
+}
+
+.chip-add-tag {
+  background: rgba(16, 185, 129, 0.15);
+  border: 2px dashed var(--accent-mint);
+  color: var(--accent-mint);
+  font-weight: 800;
+}
+
+.chip-add-tag:hover {
+  background: var(--accent-mint);
+  color: #070c16;
+  border-style: solid;
+}
+
+.new-tag-input-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+}
+
+.text-input-tag {
+  flex: 1;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.btn-subtle-ok {
+  background: var(--color-start);
+  color: #fff;
+  border: none;
+  padding: 0.55rem 0.95rem;
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-subtle-cancel {
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  padding: 0.55rem 0.75rem;
+  cursor: pointer;
+}
+
+.geo-location-box {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.geo-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+}
+
+.geo-label {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  min-width: 90px;
+}
+
+.geo-val {
+  font-family: monospace;
+  color: #fff;
+  font-size: 1rem;
+}
+
+.geo-address {
+  color: #e2e8f0;
+  font-weight: 700;
+}
+
+.geo-accuracy-highlight {
+  color: var(--accent-cyan);
+  font-weight: 800;
+  background: rgba(6, 182, 212, 0.15);
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-sm);
+}
+
+.btn-refine-large {
+  appearance: none;
+  background: linear-gradient(145deg, #1e293b, #0f172a);
+  border: 2px solid var(--accent-cyan);
+  color: #fff;
+  padding: 1.15rem 1.25rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.25);
+  transition: all 0.15s ease;
+}
+
+.btn-refine-large:hover {
+  background: linear-gradient(145deg, #0f172a, #164e63);
+  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-refine-large:active {
+  transform: translateY(1px);
+}
+
+.refine-icon {
+  font-size: 1.6rem;
+}
+
+.refine-text {
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  color: var(--accent-cyan);
+}
+
+.refine-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.btn-refine-large.refining {
+  border-color: var(--accent-mint);
+  animation: refinePulse 0.9s infinite;
+}
+
+@keyframes refinePulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(52, 211, 153, 0.4); }
+  50% { box-shadow: 0 0 25px rgba(52, 211, 153, 0.8); }
+}
+
+.refine-status-msg {
+  text-align: center;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--accent-mint);
+  padding: 0.45rem;
+  background: rgba(16, 185, 129, 0.12);
+  border-radius: var(--radius-sm);
+}
+
+.modal-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.btn-modal-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  padding: 0.95rem;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-modal-save {
+  background: var(--color-start);
+  border: none;
+  color: #070c16;
+  padding: 0.95rem;
+  border-radius: var(--radius-md);
+  font-size: 1.15rem;
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+}
+
+.btn-modal-save:hover {
+  background: #34d399;
+}
+
+/* ==========================================================================
+   TOAST ÉRTESÍTÉSEK
+   ========================================================================== */
+.toast-container {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  z-index: 3000;
+  pointer-events: none;
+}
+
+.toast {
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid var(--border-active);
+  color: #fff;
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  animation: toastIn 0.2s ease-out;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================================================
+   RESPONSIVE
+   ========================================================================== */
+@media (max-width: 850px) {
+  .top-status-bar {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+    text-align: center;
+  }
+  
+  .app-brand-box {
+    justify-content: center;
+  }
+  
+  .gps-status-panel {
+    align-items: center;
+    text-align: center;
+  }
+
+  .gps-indicator-row {
+    justify-content: center;
+  }
+
+  .status-telemetry-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .summary-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-compare-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .extra-metrics-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .settings-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .io-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-days-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .strength-calculation-banner {
+    grid-template-columns: 1fr;
+    text-align: center;
+    justify-items: center;
+  }
+
+  .action-btn-stacked {
+    padding: 1rem 1.2rem;
+    min-height: 68px;
+  }
+
+  .action-btn-stacked .btn-label {
+    font-size: 1.2rem;
+  }
+}
+
+/* ==========================================================================
+   2-RÉTEGŰ TÉRKÉPVÁLTÓ (UTCANÉZET & MŰHOLDKÉP)
+   ========================================================================== */
+.map-layer-switch-box {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 3px;
+}
+
+.layer-pill-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.layer-pill-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.layer-pill-btn.active {
+  background: var(--color-waypoint);
+  color: #fff;
+  border-color: #38bdf8;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.35);
+}
+
+/* ==========================================================================
+   VÁLTOZTATHATÓ NAPI CÉL & PIHENŐIDŐ GYORSSÁV
+   ========================================================================== */
+.goal-rest-quick-bar {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.goal-params-group {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.quick-param-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.quick-param-badge .p-label {
+  color: var(--text-dim);
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.quick-param-badge .p-val {
+  color: #fff;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-quick-edit-param {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--accent-cyan);
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: all 0.15s ease;
+}
+
+.btn-quick-edit-param:hover {
+  background: rgba(6, 182, 212, 0.15);
+  border-color: var(--accent-cyan);
+  color: #fff;
+}
+
+/* ==========================================================================
+   MÁSODPERC ALAPÚ KIMUTATÁS & ESEMÉNY-IDŐVONAL (SCREEN 3)
+   ========================================================================== */
+.seconds-timeline-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.sec-timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sec-timeline-header h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.sec-total-badge {
+  background: rgba(6, 182, 212, 0.15);
+  border: 1px solid var(--accent-cyan);
+  color: #67e8f9;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-full);
+}
+
+.sec-timeline-segments-bar {
+  width: 100%;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  border: 1px solid var(--border-subtle);
+}
+
+.sec-seg-walk {
+  background: linear-gradient(90deg, #10b981, #059669);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  overflow: hidden;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+.sec-seg-rest {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #070c16;
+  font-size: 0.75rem;
+  font-weight: 900;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sec-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sec-event-row {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Leaflet Pin Stílusok */
+.wp-history-pin, .wp-leaflet-pin, .start-pin, .end-pin {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.sec-event-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 0.5rem;
+}
+
+.sec-event-time {
+  font-family: monospace;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.12);
+  padding: 0.2rem 0.55rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+.sec-event-desc {
+  color: #e2e8f0;
+  font-weight: 600;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  word-break: normal;
+  overflow-wrap: break-word;
+  white-space: normal;
+  width: 100%;
+}
+
+.sec-event-duration {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+
+.sec-event-duration.is-rest {
+  color: #fbbf24;
+}
+
+/* ==========================================================================
+   SZINTLÉPÉSES MÉRFÖLDKŐ RENDSZER (SCREEN 4)
+   "Ha a cél 500m, de elértem, akkor a következő szint 1000 lépés lesz.
+    Ezeket a szinteket én adhassam meg"
+   ========================================================================== */
+.level-progression-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.level-active-banner {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(16, 185, 129, 0.14) 100%);
+  border: 2px solid var(--accent-gold);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.level-big-badge {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: rgba(251, 191, 36, 0.2);
+  border: 3px solid var(--accent-gold);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+  flex-shrink: 0;
+}
+
+.level-big-badge .l-num {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: var(--accent-gold);
+  line-height: 1;
+}
+
+.level-big-badge .l-text {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.level-active-info {
+  width: 100%;
+  min-width: 0;
+}
+
+.level-active-info h3 {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #fff;
+  word-break: break-word;
+}
+
+.level-active-info p {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  margin-top: 0.25rem;
+  line-height: 1.35;
+}
+
+.level-progress-track {
+  width: 100%;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: 0.6rem;
+  border: 1px solid var(--border-subtle);
+}
+
+.level-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399, #fbbf24);
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+}
+
+.level-ladder-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 0.75rem;
+}
+
+.level-ladder-header h3 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.level-ladder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.level-ladder-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 0.85rem;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "pill info"
+    "badge badge";
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  transition: all 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.level-ladder-row .ladder-lvl-pill {
+  grid-area: pill;
+  width: 36px;
+  height: 36px;
+  font-size: 0.95rem;
+}
+
+.level-ladder-row .ladder-info-col {
+  grid-area: info;
+  min-width: 0;
+}
+
+.level-ladder-row > div:last-child {
+  grid-area: badge;
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.level-ladder-row.unlocked {
+  border-color: rgba(16, 185, 129, 0.5);
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.08), var(--bg-card));
+}
+
+.level-ladder-row.active {
+  border-color: var(--accent-gold);
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.12), var(--bg-card));
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.25);
+}
+
+.level-ladder-row.locked {
+  opacity: 0.65;
+}
+
+.ladder-lvl-pill {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.level-ladder-row.active .ladder-lvl-pill {
+  background: var(--accent-gold);
+  color: #070c16;
+  border-color: #fff;
+}
+
+.level-ladder-row.unlocked .ladder-lvl-pill {
+  background: var(--color-start);
+  color: #070c16;
+}
+
+.ladder-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ladder-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.ladder-target-metric {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.ladder-target-metric strong {
+  color: var(--accent-cyan);
+}
+
+.ladder-status-badge {
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+}
+
+.ladder-status-badge.done {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--accent-mint);
+  border: 1px solid var(--color-start);
+}
+
+.ladder-status-badge.current {
+  background: rgba(251, 191, 36, 0.2);
+  color: var(--accent-gold);
+  border: 1px solid var(--accent-gold);
+}
+
+.ladder-status-badge.pending {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+}
+
+/* SAJÁT SZINTEK SZERKESZTŐJE */
+.custom-levels-editor-box {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.custom-levels-editor-box h4 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.level-edit-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.level-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: var(--bg-surface);
+  padding: 0.75rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.lvl-edit-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.lvl-edit-badge {
+  color: var(--accent-gold);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.lvl-edit-field-wrap {
+  width: 100%;
+}
+
+.lvl-edit-field-wrap .lvl-edit-name {
+  width: 100%;
+  font-size: 0.88rem;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.lvl-edit-target-metric-row {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  align-items: center;
+}
+
+.lvl-edit-target-metric-row .lvl-edit-target {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+
+.lvl-edit-target-metric-row .lvl-edit-metric {
+  flex: 0 0 115px;
+  max-width: 130px;
+  font-size: 0.88rem;
+  box-sizing: border-box;
+}
+
+.level-edit-row input, .level-edit-row select {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.88rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.level-edit-row input:focus, .level-edit-row select:focus {
+  border-color: var(--color-waypoint);
+}
+
+.btn-remove-level {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 4px;
+}
+
+.btn-remove-level:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* ==========================================================================
+   GOOGLE DRIVE FELHŐ SZINKRONIZÁCIÓ (ANDROID ↔ SZÁMÍTÓGÉP)
+   ========================================================================== */
+.gdrive-section-card {
+  background: var(--bg-card);
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  margin-bottom: 1.5rem;
+}
+
+.gdrive-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.gdrive-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.gdrive-icon {
+  font-size: 2rem;
+}
+
+.gdrive-sub {
+  font-size: 0.82rem;
+  color: var(--accent-cyan, #06b6d4);
+  font-weight: 700;
+}
+
+.gdrive-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  border: 1px solid var(--border-subtle);
+}
+
+.gdrive-status-badge.disconnected {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.gdrive-status-badge.connected {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+.gdrive-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.gdrive-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.gdrive-box {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.gdrive-box-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.btn-gdrive-action {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
+  color: #fff;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: all 0.15s ease;
+}
+
+.btn-gdrive-action:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-gdrive-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-gdrive-action.connect {
+  background: #0284c7;
+  border-color: #38bdf8;
+  color: #fff;
+}
+.btn-gdrive-action.connect:hover {
+  background: #0369a1;
+}
+
+.btn-gdrive-action.download {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #34d399;
+}
+.btn-gdrive-action.download:hover:not(:disabled) {
+  background: #10b981;
+  color: #fff;
+}
+
+.btn-gdrive-action.upload {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+.btn-gdrive-action.upload:hover:not(:disabled) {
+  background: #38bdf8;
+  color: #000;
+}
+
+.btn-gdrive-action.local-drive {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #f59e0b;
+  color: #fbbf24;
+  width: 100%;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+.btn-gdrive-action.local-drive:hover {
+  background: #f59e0b;
+  color: #000;
+}
+
+.btn-gdrive-action.disconnect {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #fca5a5;
+}
+
+/* ==========================================================================
+   MOBIL & PWA VEZÉRLŐSÁV (Valós GPS / Teszt mód, Telepítés, Képernyőzár)
+   ========================================================================== */
+.mobile-pwa-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.85rem;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.pwa-mode-toggle-group {
+  display: flex;
+  gap: 0.35rem;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.2rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mode-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-pill-btn.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+}
+
+.pwa-action-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.wakelock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.btn-pwa-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #070c16;
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-pwa-install:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.6);
+}
+
+.btn-pwa-install.pulse {
+  animation: pwaPulse 2s infinite;
+}
+
+@keyframes pwaPulse {
+  0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(56, 189, 248, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+}
+
+@media (max-width: 640px) {
+  .mobile-pwa-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pwa-action-group {
+    margin-left: 0;
+    justify-content: space-between;
+  }
+  .btn-pwa-install {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+/* ==========================================================================
+   ÁTFOGÓ MOBIL MEGJELENÉS ÉS KILÓGÓ FELIRATOK JAVÍTÁSA
+   (Kisebb képernyőkön, mobiltelefonokon semmi nem lóg ki, minden szöveg tiszta)
+   ========================================================================== */
+
+/* Globális szövegtörés és szélesség korlátok */
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Gombok és linkek szövegillesztése */
+.action-btn-stacked {
+  flex-wrap: wrap;
+  overflow: hidden;
+}
+
+.action-btn-stacked .btn-hint {
+  word-break: break-word;
+}
+
+.level-ladder-item,
+.level-item-name,
+.sec-event-desc,
+.wp-card-name,
+.w-item-info-col h4 {
+  min-width: 0;
+  word-break: break-word;
+}
+
+/* Modális ablakok telefonos méretezése */
+.modal-card {
+  max-width: min(520px, calc(100vw - 1.25rem)) !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  margin: 0.6rem !important;
+}
+
+@media (max-width: 900px) {
+  /* Fő konténer margó csökkentés mobilon */
+  .main-screen-container {
+    padding: 0.6rem 0.6rem 4rem 0.6rem;
+    gap: 0.85rem;
+  }
+
+  /* 1. Felső állapotsáv (Logó, Óra, Dátum, GPS) elrendezése 2 sorba */
+  .top-status-bar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "brand gps"
+      "clock clock";
+    padding: 0.75rem 0.85rem;
+    gap: 0.65rem;
+  }
+
+  .app-brand-box {
+    grid-area: brand;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .app-logo-img {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+  }
+
+  .brand-text-wrap {
+    min-width: 0;
+  }
+
+  .brand-text-wrap .app-title {
+    font-size: 1.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .brand-text-wrap .app-sub {
+    font-size: 0.72rem;
+  }
+
+  .gps-status-panel {
+    grid-area: gps;
+    text-align: right;
+    min-width: 0;
+  }
+
+  .gps-title {
+    font-size: 0.85rem;
+  }
+
+  .gps-acc-badge {
+    font-size: 0.75rem;
+    padding: 0.1rem 0.4rem;
+  }
+
+  .gps-details-row {
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 175px;
+  }
+
+  .time-date-panel {
+    grid-area: clock;
+    padding: 0.45rem 0.85rem;
+    width: 100%;
+  }
+
+  .live-clock {
+    font-size: 1.65rem;
+  }
+
+  .live-date {
+    font-size: 0.78rem;
+  }
+
+  /* 2. Állapotsáv (Telemetria) - Állapot felül, alatta 2x2 rendezett rács, nem lóg ki semmi! */
+  .status-telemetry-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+    padding: 0.75rem;
+  }
+
+  .telemetry-col:nth-child(1) {
+    grid-column: 1 / -1;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .status-badge {
+    font-size: 0.88rem !important;
+    padding: 0.35rem 0.85rem;
+    white-space: normal;
+    text-align: center;
+    max-width: 100%;
+    word-break: break-word;
+    display: inline-block;
+  }
+
+  .t-label {
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
+
+  .t-val {
+    font-size: 1.25rem;
+    word-break: break-word;
+  }
+
+  .t-distance {
+    font-size: 1.5rem;
+  }
+
+  #live-timer {
+    font-size: 1.15rem;
+    white-space: nowrap;
+  }
+
+  .telemetry-col:nth-child(5) {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    justify-content: center;
+    gap: 0.5rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .telemetry-col:nth-child(5) .t-val {
+    font-size: 1.05rem;
+  }
+
+  /* 3. Nagy egymás alá halmozott gombok feliratai */
+  .action-btn-stacked {
+    padding: 0.85rem 1rem;
+    min-height: auto;
+    gap: 0.4rem 0.75rem;
+  }
+
+  .action-btn-stacked .btn-icon {
+    font-size: 1.8rem;
+    width: 36px;
+  }
+
+  .action-btn-stacked .btn-label {
+    font-size: 1.18rem;
+    letter-spacing: 0;
+  }
+
+  .action-btn-stacked .btn-hint {
+    margin-left: 0;
+    width: 100%;
+    padding-left: calc(36px + 0.75rem);
+    font-size: 0.78rem;
+    line-height: 1.25;
+    word-break: break-word;
+    opacity: 0.9;
+  }
+
+  /* 4. Gyors cél & pihenő sáv */
+  .goal-rest-quick-bar {
+    padding: 0.65rem 0.85rem;
+    gap: 0.5rem;
+  }
+
+  .goal-params-group {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .quick-param-badge {
+    justify-content: space-between;
+    width: 100%;
+    font-size: 0.82rem;
+  }
+
+  .btn-quick-edit-param {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.74rem;
+  }
+
+  /* 5. Bot mérősáv */
+  .stick-live-strip {
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.5rem;
+    text-align: center;
+  }
+
+  .stick-strip-divider {
+    display: none;
+  }
+
+  /* Térkép fejléc és rétegkapcsoló mobilon (a műholdkép és utcanézet mindig kifér!) */
+  .map-header-bar {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 0.65rem 0.75rem !important;
+    gap: 0.5rem !important;
+  }
+
+  .map-title {
+    font-size: 0.95rem !important;
+    width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .map-actions {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    gap: 0.4rem !important;
+  }
+
+  .map-actions .btn-subtle {
+    flex-shrink: 0 !important;
+    padding: 0.35rem 0.6rem !important;
+    font-size: 0.76rem !important;
+  }
+
+  .map-layer-switch-box {
+    display: flex !important;
+    flex: 1 !important;
+    max-width: 220px !important;
+    justify-content: center !important;
+  }
+
+  .layer-pill-btn {
+    flex: 1 !important;
+    justify-content: center !important;
+    padding: 0.32rem 0.45rem !important;
+    font-size: 0.74rem !important;
+    gap: 0.25rem !important;
+  /* 5b. Mentett Séták Idővonal Kártyái (Screen 2) - Mind a 3 gomb (Térkép, Mentés, Törlés) kényelmesen elfér! */
+  .walk-timeline-item {
+    grid-template-columns: auto 1fr !important;
+    grid-template-areas:
+      "badge info"
+      "actions actions" !important;
+    gap: 0.65rem 0.75rem !important;
+    padding: 0.85rem !important;
+  }
+
+  .w-item-date-badge {
+    grid-area: badge !important;
+    min-width: 52px !important;
+  }
+
+  .w-item-info-col {
+    grid-area: info !important;
+    min-width: 0 !important;
+  }
+
+  .w-item-actions-col {
+    grid-area: actions !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr 1fr !important;
+    gap: 0.4rem !important;
+    width: 100% !important;
+    margin-top: 0.25rem !important;
+    padding-top: 0.5rem !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .w-item-select-btn,
+  .w-item-save-btn,
+  .w-item-delete-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 0.5rem 0.3rem !important;
+    font-size: 0.78rem !important;
+    box-sizing: border-box !important;
+    white-space: nowrap !important;
+  }
+
+  /* 6. Útvonal összesítő metrika kártyák */
+  .summary-metrics-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+  }
+
+  .sum-metric-card {
+    padding: 0.85rem;
+  }
+
+  .sum-metric-header {
+    font-size: 0.72rem;
+  }
+
+  .sum-metric-val {
+    font-size: 1.35rem;
+    word-break: break-word;
+  }
+
+  .sum-metric-sub {
+    font-size: 0.74rem;
+    word-break: break-word;
+  }
+
+  /* 6. Másodperc alapú esemény-idővonal (Screen 3) álló nézetben is jól látható */
+  .seconds-timeline-box {
+    padding: 0.85rem !important;
+    gap: 0.65rem !important;
+  }
+
+  .sec-event-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.45rem !important;
+    padding: 0.75rem 0.85rem !important;
+    align-items: stretch !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .sec-event-top-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    gap: 0.5rem !important;
+  }
+
+  .sec-event-time {
+    font-size: 0.82rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  .sec-event-duration {
+    font-size: 0.82rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+
+  .sec-event-desc {
+    width: 100% !important;
+    font-size: 0.9rem !important;
+    line-height: 1.4 !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+  }
+
+  /* 7. Útpont kezelő sorok (Screen 4) */
+  .wp-manage-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.65rem !important;
+    padding: 0.75rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .wp-row-main-wrap {
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 0.6rem !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .btn-star-fav {
+    font-size: 1.3rem !important;
+    flex-shrink: 0 !important;
+    padding: 0 !important;
+    margin-top: 2px !important;
+  }
+
+  .wp-row-info-col {
+    flex: 1 !important;
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .wp-row-name-input {
+    font-size: 0.95rem;
+    padding: 0.15rem;
+  }
+
+  .wp-row-meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.6rem;
+    font-size: 0.75rem;
+    word-break: break-word;
+  }
+
+  .wp-row-actions-group {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+    padding-top: 0.5rem !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+    box-sizing: border-box !important;
+  }
+
+  .wp-row-actions-group .btn-icon-action {
+    width: 100% !important;
+    justify-content: center !important;
+    font-size: 0.85rem !important;
+    padding: 0.55rem 0.6rem !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 8. Beállítások kártyák (Screen 6) */
+  .settings-feature-card > div,
+  .settings-danger-card > div {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 0.75rem !important;
+  }
+
+  .settings-feature-card > div > div,
+  .settings-danger-card > div > div {
+    max-width: 100% !important;
+  }
+
+  .settings-feature-card button,
+  .settings-danger-card button {
+    width: 100% !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  .gdrive-box {
+    padding: 0.85rem;
+  }
+
+  .btn-gdrive-action {
+    width: 100%;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .io-actions-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .btn-io {
+    width: 100%;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  /* ==========================================================================
+     4. KÉPERNYŐ (FEJLŐDÉS & SZINTEK) ÁLLÓ KÉPERNYŐS RESZPONZÍV JAVÍTÁSOK
+     "Még mindig kilóg a fejlődés oldalon álló képernyőnél egy csomó minden"
+     ========================================================================== */
+  .fitness-trends-card {
+    padding: 1rem 0.85rem;
+    gap: 1rem;
+  }
+
+  .fitness-trends-header h2 {
+    font-size: 1.15rem;
+    line-height: 1.3;
+  }
+
+  /* Aktív Szint Kiemelt Banner */
+  .level-active-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1.25rem 1rem;
+    gap: 1rem;
+  }
+
+  .level-big-badge {
+    width: 72px;
+    height: 72px;
+  }
+
+  .level-big-badge .l-num {
+    font-size: 1.5rem;
+  }
+
+  .level-active-info {
+    width: 100%;
+  }
+
+  .level-active-info h3 {
+    font-size: 1.1rem;
+    word-break: break-word;
+  }
+
+  .level-active-info p {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .level-active-info > div:last-child {
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  #btn-trigger-level-editor {
+    width: 100%;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+    padding: 0.65rem 1rem;
+    font-size: 0.88rem;
+  }
+
+  /* Szintlépési Létra Sorok */
+  .level-ladder-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+
+  .level-ladder-row {
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      "pill info"
+      "badge badge";
+    gap: 0.6rem 0.75rem;
+    padding: 0.85rem;
+    align-items: center;
+  }
+
+  .ladder-lvl-pill {
+    grid-area: pill;
+    width: 38px;
+    height: 38px;
+    font-size: 0.95rem;
+  }
+
+  .ladder-info-col {
+    grid-area: info;
+    min-width: 0;
+  }
+
+  .ladder-name {
+    font-size: 0.95rem;
+    word-break: break-word;
+  }
+
+  .ladder-target-metric {
+    font-size: 0.8rem;
+    word-break: break-word;
+  }
+
+  .level-ladder-row > div:last-child {
+    grid-area: badge;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 0.35rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  /* Saját Szintek Testreszabása Szerkesztő Táblázat */
+  .custom-levels-editor-box {
+    padding: 1rem 0.85rem;
+  }
+
+  .custom-levels-editor-box h4 {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.65rem;
+    font-size: 0.98rem;
+  }
+
+  #btn-add-new-custom-level {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .level-edit-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+    padding: 0.75rem 0.85rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .lvl-edit-header-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+
+  .lvl-edit-field-wrap {
+    width: 100% !important;
+  }
+
+  .lvl-edit-field-wrap .lvl-edit-name {
+    width: 100% !important;
+    font-size: 0.88rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .lvl-edit-target-metric-row {
+    display: flex !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+    align-items: center !important;
+  }
+
+  .lvl-edit-target-metric-row .lvl-edit-target {
+    flex: 1 !important;
+    min-width: 0 !important;
+    font-size: 0.88rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .lvl-edit-target-metric-row .lvl-edit-metric {
+    flex: 0 0 115px !important;
+    max-width: 130px !important;
+    font-size: 0.88rem !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Kalória & Hasonlító Rács */
+  .progress-compare-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .compare-card {
+    padding: 1rem;
+  }
+
+  .compare-val {
+    font-size: 1.5rem;
+  }
+
+  /* Erősödés átlaga sebességből */
+  .strength-calculation-banner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1.25rem 1rem;
+    gap: 1rem;
+  }
+
+  .strength-gauge-circle {
+    width: 102px !important;
+    height: 102px !important;
+    min-width: 102px !important;
+    min-height: 102px !important;
+    border-radius: 50% !important;
+    padding: 6px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+  }
+
+  .strength-gauge-circle .s-pct {
+    font-size: 1.15rem !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
+    letter-spacing: -0.5px !important;
+    text-align: center !important;
+    max-width: 90px !important;
+  }
+
+  .strength-gauge-circle .s-label {
+    font-size: 0.65rem !important;
+    font-weight: 800 !important;
+    text-transform: uppercase !important;
+    margin-top: 3px !important;
+    text-align: center !important;
+    color: #cbd5e1 !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  .strength-info-content {
+    text-align: center;
+  }
+
+  .strength-info-content h3 {
+    font-size: 1.05rem;
+    line-height: 1.3;
+  }
+
+  .strength-info-content p {
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  /* SM Terhelhetőségi szalag */
+  .extra-metrics-strip {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+
+  .extra-item {
+    padding: 0.6rem;
+  }
+
+  .extra-item .e-label {
+    font-size: 0.7rem;
+    word-break: break-word;
+  }
+
+  .extra-item .e-val {
+    font-size: 1.1rem;
+  }
+
+  /* ==========================================================================
+     5. KÉPERNYŐ (ÚTPONTOK & MODAL) ÁLLÓ KÉPERNYŐS JAVÍTÁSOK
+     "nem jól van az útpontok oldalon az új útpont"
+     ========================================================================== */
+  .waypoint-management-card {
+    padding: 1rem 0.85rem;
+    gap: 1rem;
+  }
+
+  .wp-mgmt-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .wp-mgmt-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .wp-mgmt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 0.45rem;
+  }
+
+  .wp-mgmt-actions .btn-subtle,
+  .wp-mgmt-actions .btn-add-wp-trigger {
+    flex: 1 1 calc(33.333% - 0.45rem);
+    min-width: 85px;
+    justify-content: center;
+    padding: 0.65rem 0.4rem;
+    font-size: 0.82rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  /* Útpont Rögzítő Modal Ablak (100%-ban görgethető mobilon) */
+  .modal-backdrop {
+    padding: 0.5rem;
+  }
+
+  .modal-window-card {
+    max-height: 94vh;
+  }
+
+  .modal-header-strip {
+    padding: 0.85rem 1rem;
+  }
+
+  .modal-title-wrap h2 {
+    font-size: 1.15rem;
+  }
+
+  .waypoint-modal-form {
+    padding: 1rem 0.85rem;
+    gap: 1rem;
+  }
+
+  .text-input-large {
+    font-size: 1rem;
+    padding: 0.75rem 0.85rem;
+  }
+
+  .tag-cloud-wrapper {
+    gap: 0.35rem;
+  }
+
+  .chip-btn {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .new-tag-input-box {
+    flex-wrap: wrap;
+  }
+
+  .geo-location-box {
+    padding: 0.75rem 0.85rem;
+    gap: 0.5rem;
+  }
+
+  .geo-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+  }
+
+  .geo-label {
+    min-width: 0;
+    font-size: 0.75rem;
+  }
+
+  .geo-val {
+    font-size: 0.88rem;
+    word-break: break-all;
+  }
+
+  .geo-address {
+    font-size: 0.84rem;
+    word-break: break-word;
+  }
+
+  .geo-accuracy-highlight {
+    font-size: 0.8rem;
+    display: inline-block;
+  }
+
+  .btn-refine-large {
+    padding: 0.85rem 1rem;
+    gap: 0.2rem;
+  }
+
+  .refine-icon {
+    font-size: 1.35rem;
+  }
+
+  .refine-text {
+    font-size: 1.15rem;
+  }
+
+  .refine-sub {
+    font-size: 0.72rem;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .modal-actions-row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .modal-actions-row button {
+    flex: 1;
+    justify-content: center;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  /* ==========================================================================
+     6. KÉPERNYŐ (SM BEÁLLÍTÁSOK) ÁLLÓ KÉPERNYŐS JAVÍTÁSOK
+     "a beállításoknnál az sm beállítós rész"
+     ========================================================================== */
+  .settings-main-card {
+    padding: 1rem 0.85rem;
+    gap: 1.25rem;
+  }
+
+  .settings-section-title {
+    font-size: 1.1rem;
+    line-height: 1.35;
+  }
+
+  .settings-form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .s-field {
+    width: 100%;
+  }
+
+  .s-field label {
+    font-size: 0.78rem;
+    letter-spacing: 0.3px;
+  }
+
+  .s-field input, .s-field select {
+    padding: 0.65rem 0.85rem;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+
+  .s-field small {
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+}
+
+/* ==========================================================================
+   GPX MENTÉS ÉS KÖZVETLEN MEGNYITÁS MODAL & FELUGRÓ ABLAK
+   ========================================================================== */
+.gpx-save-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(7, 12, 22, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  overflow-y: auto;
+  box-sizing: border-box;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.gpx-save-modal-content {
+  background: linear-gradient(145deg, #131d2e, #0d1522);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: 16px;
+  padding: 1.25rem 1.35rem;
+  max-width: 480px;
+  max-height: 88vh;
+  overflow-y: auto;
+  box-sizing: border-box;
+  width: 100%;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(56, 189, 248, 0.2);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  animation: scaleIn 0.25s ease-out;
+}
+
+.gpx-save-modal-content .modal-icon {
+  font-size: 2.8rem;
+  line-height: 1;
+}
+
+.gpx-save-modal-content h3 {
+  font-size: 1.25rem;
+  color: #fff;
+  margin: 0;
+  font-weight: 700;
+}
+
+.gpx-save-modal-content .modal-filename {
+  font-family: monospace;
+  font-size: 0.95rem;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 0.45rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  word-break: break-all;
+  margin: 0;
+}
+
+.gpx-save-modal-content .modal-desc {
+  font-size: 0.88rem;
+  color: #94a3b8;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.gpx-save-modal-content .modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btn-modal-open {
+  flex: 2;
+  background: linear-gradient(135deg, #0284c7, #0369a1);
+  color: #ffffff;
+  border: 1px solid #38bdf8;
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+  transition: all 0.2s ease;
+}
+
+.btn-modal-open:active {
+  transform: scale(0.97);
+}
+
+.btn-modal-close {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-modal-close:active {
+  transform: scale(0.97);
+}
+
+/* ==========================================================================
+   MÉRT LÉPÉSHOSSZ & SM JÁRÁSDINAMIKA ELEMZÉS (SCREEN 3)
+   ========================================================================== */
+.summary-steplen-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.summary-steplen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.summary-steplen-header h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.steplen-avg-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--accent-gold);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  font-size: 0.85rem;
+  font-weight: 800;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+.steplen-desc-note {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.steplen-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.65rem;
+}
+
+.steplen-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.steplen-card-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.steplen-card-val {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.steplen-card-sub {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+}
+
+.steplen-dynamics-wrap {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.steplen-dyn-title {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--accent-cyan);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.steplen-bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.steplen-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+}
+
+.steplen-bar-label {
+  width: 90px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.steplen-bar-track {
+  flex: 1;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.steplen-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+  justify-content: flex-end;
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #070c16;
+}
+
+.steplen-bar-val {
+  width: 55px;
+  text-align: right;
+  font-weight: 800;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.steplen-insight-badge {
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+.steplen-insight-badge.good {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #a7f3d0;
+}
+.steplen-insight-badge.fatigue {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fde68a;
+}
+.steplen-insight-badge.warning {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+@media (max-width: 600px) {
+  .summary-steplen-box {
+    padding: 0.85rem !important;
+    gap: 0.65rem !important;
+  }
+  .steplen-metrics-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .steplen-bar-label {
+    width: 75px;
+  }
+}
+
+/* ==========================================================================
+   LEBEGŐ GYORSVEZÉRLŐK (BAL FELSŐ ? ÉS JOBB FELSŐ 💡)
+   ========================================================================== */
+.floating-corner-btn {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 900;
+  cursor: pointer;
+  z-index: 10050;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 10px rgba(56, 189, 248, 0.15);
+  transition: transform 0.15s ease, background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  outline: none;
+}
+
+.floating-corner-btn:active {
+  transform: scale(0.92);
+}
+
+.floating-corner-btn.btn-float-left {
+  left: 14px;
+}
+
+.floating-corner-btn.btn-float-right {
+  right: 14px;
+}
+
+/* Hosszan nyomás alatti vizuális pulzálás */
+.floating-corner-btn.pressing {
+  border-color: var(--accent-gold, #fbbf24);
+  box-shadow: 0 0 20px 6px rgba(251, 191, 36, 0.65), 0 4px 16px rgba(0, 0, 0, 0.6);
+  transform: scale(1.1);
+}
+
+/* Bekapcsolt Vaku (Lámpa) állapot */
+.floating-corner-btn.torch-active {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  color: #070c16;
+  border-color: #fef08a;
+  box-shadow: 0 0 26px 8px rgba(251, 191, 36, 0.85), 0 4px 16px rgba(0, 0, 0, 0.6);
+  animation: torchActiveGlow 1.4s ease-in-out infinite;
+}
+
+@keyframes torchActiveGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px 6px rgba(251, 191, 36, 0.75), 0 4px 14px rgba(0, 0, 0, 0.5);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 32px 12px rgba(251, 191, 36, 1), 0 4px 20px rgba(0, 0, 0, 0.7);
+    transform: scale(1.06);
+  }
+}
+
+.guide-card-item {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1rem;
+}
+
